@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 export type Task = {
   id: number;
   title: string;
+  description: string | null; // <-- La línea añadida
   due_date: string | null;
   completed: boolean;
   user_responsible: string | null;
@@ -30,11 +31,13 @@ export default function TaskCard({ task, onUpdate, onDelete, onSelect }: TaskCar
     setNodeRef,
     transform,
     transition,
+    isDragging,
   } = useSortable({ id: task.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    opacity: isDragging ? 0.5 : 1,
   };
   
   const completedClass = task.completed ? 'line-through text-gray-400' : '';
@@ -60,15 +63,9 @@ export default function TaskCard({ task, onUpdate, onDelete, onSelect }: TaskCar
       {...attributes}
       className={`bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex items-center space-x-3 transition-all ${completedClass}`}
     >
-      {/* MANGO PARA ARRASTRAR (DRAG HANDLE) CON NUEVO ÍCONO */}
-      <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-2 text-gray-400 hover:text-gray-700">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <circle cx="9" cy="6" r="1.5"></circle>
-          <circle cx="15" cy="6" r="1.5"></circle>
-          <circle cx="9" cy="12" r="1.5"></circle>
-          <circle cx="15" cy="12" r="1.5"></circle>
-          <circle cx="9" cy="18" r="1.5"></circle>
-          <circle cx="15" cy="18" r="1.5"></circle>
+      <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-2 text-gray-400">
+        <svg viewBox="0 0 20 20" width="16" fill="currentColor">
+          <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-12a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"></path>
         </svg>
       </div>
       

@@ -97,6 +97,7 @@ export default function ProjectDetailPage() {
     const { error } = await supabase.rpc('update_task_details', {
       task_id: editingTask.id,
       new_title: updatedData.title,
+      new_description: updatedData.description, // <-- Añadimos el nuevo campo
       new_due_date: updatedData.due_date,
       new_project_id: updatedData.project_id,
       new_responsible: updatedData.user_responsible

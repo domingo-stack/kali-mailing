@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import RichTextEditor from './RichTextEditor' // Importamos nuestro nuevo editor
 
 // Tipos de datos que usa este componente
 type Comment = { id: number; created_at: string; content: string; user_name: string | null; };
 type Subtask = { id: number; title: string; is_completed: boolean; task_id: number; description: string | null; due_date: string | null; user_responsible: string | null; };
 type Project = { id: number; name: string; };
-type Task = { id: number; title: string; due_date: string | null; completed: boolean; user_responsible: string | null; status: string; projects: { id: number; name: string; } | null; };
+type Task = { id: number; title: string; description: string | null; due_date: string | null; completed: boolean; user_responsible: string | null; status: string; projects: { id: number; name: string; } | null; };
 
 // Propiedades que el formulario de edición recibe
 type EditTaskFormProps = {
@@ -24,6 +25,7 @@ type EditTaskFormProps = {
 
 export default function EditTaskForm({ task, projects, subtasks = [], comments = [], onSave, onCancel, onSubtaskAdd, onSubtaskToggle, onCommentAdd, onToggleComplete }: EditTaskFormProps) {
   const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description || '');
   const [dueDate, setDueDate] = useState(task.due_date ? task.due_date.split('T')[0] : '');
   const [selectedProjectId, setSelectedProjectId] = useState<number | ''>(task.projects?.id || '');
   const [responsible, setResponsible] = useState(task.user_responsible || '');
@@ -34,6 +36,7 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
 
   useEffect(() => {
     setTitle(task.title);
+    setDescription(task.description || '');
     setDueDate(task.due_date ? task.due_date.split('T')[0] : '');
     setSelectedProjectId(task.projects?.id || '');
     setResponsible(task.user_responsible || '');
@@ -43,6 +46,7 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
     e.preventDefault();
     const updatedData = {
       title: title.trim(),
+      description: description,
       due_date: dueDate === '' ? null : dueDate,
       project_id: selectedProjectId === '' ? null : Number(selectedProjectId),
       user_responsible: responsible.trim() === '' ? null : responsible.trim()
@@ -78,7 +82,7 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
   return (
     <div className="relative p-6">
        <button onClick={onCancel} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 z-10">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        <svg xmlns="http://www.w.3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
 
       <div className="flex items-center mb-6 pb-4 border-b">
@@ -102,6 +106,15 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full font-bold text-2xl border-none focus:ring-0 p-0 bg-transparent"
+              disabled={isCompleted}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-500 mb-1">Descripción</label>
+            <RichTextEditor
+              content={description}
+              onChange={(newDescription) => setDescription(newDescription)}
               disabled={isCompleted}
             />
           </div>
@@ -139,9 +152,13 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
                 );
               })}
             </div>
-            <div className="flex items-center gap-2 pt-2">
-              <input type="text" value={newSubtaskTitle} onChange={(e) => setNewSubtaskTitle(e.target.value)} placeholder="Añadir una nueva sub-tarea" className="flex-grow border-gray-300 rounded-md shadow-sm" disabled={isCompleted} />
-              <button type="button" onClick={handleAddSubtask} className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300" disabled={isCompleted}>Añadir</button>
+            <div className="space-y-2 pt-2 border-t border-dashed">
+              <input type="text" value={newSubtaskTitle} onChange={(e) => setNewSubtaskTitle(e.target.value)} placeholder="Título nueva sub-tarea" className="w-full border-gray-300 rounded-md shadow-sm sm:text-sm" />
+              <div className="flex items-center gap-2">
+                <input type="text" value={newSubtaskResponsible} onChange={(e) => setNewSubtaskResponsible(e.target.value)} placeholder="Responsable (opcional)" className="flex-grow border-gray-300 rounded-md shadow-sm sm:text-sm" />
+                <input type="date" value={newSubtaskDueDate} onChange={(e) => setNewSubtaskDueDate(e.target.value)} className="border-gray-300 rounded-md shadow-sm sm:text-sm" />
+                <button type="button" onClick={handleAddSubtask} className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300" disabled={isCompleted}>Añadir</button>
+              </div>
             </div>
           </div>
 
