@@ -5,95 +5,48 @@ import { supabase } from '../lib/supabaseClient'
 import AddTaskForm from '../components/AddTaskForm'
 import Modal from '../components/Modal'
 import EditTaskForm from '../components/EditTaskForm'
+import TaskCard, { Task } from '../components/TaskCard'
 
-// Tipos de datos actualizados
+// Tipos de datos
 type Project = {
   id: number;
   name: string;
 };
 
-type Task = {
+type Subtask = {
   id: number;
   title: string;
+  is_completed: boolean;
+  task_id: number;
+  description: string | null;
   due_date: string | null;
-  completed: boolean;
-  user_responsible: string | null; // <-- Añadido
-  projects: {
-    id: number;
-    name: string;
-  } | null;
+  user_responsible: string | null;
 };
 
-// Componente TaskCard actualizado para mostrar el avatar
-const TaskCard = ({ task, onUpdate, onDelete, onSelect }: { task: Task, onUpdate: (task: Task) => void, onDelete: (taskId: number) => void, onSelect: (task: Task) => void }) => {
-  const completedClass = task.completed ? 'line-through text-gray-400' : '';
-  const projectName = task.projects ? task.projects.name : 'Sin Proyecto';
-  const userInitial = task.user_responsible ? task.user_responsible.charAt(0).toUpperCase() : '?';
-
-  const handleToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onUpdate({ ...task, completed: !task.completed });
-  };
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (window.confirm(`¿Estás seguro de que quieres borrar la tarea: "${task.title}"?`)) {
-      onDelete(task.id);
-    }
-  };
-
-  return (
-    <div onClick={() => onSelect(task)} className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center space-x-4 transition-all hover:shadow-md cursor-pointer ${completedClass}`}>
-      <div 
-        onClick={handleToggle}
-        className={`w-6 h-6 rounded-full flex-shrink-0 cursor-pointer transition-all ring-2 ring-gray-300 hover:ring-blue-500 ${task.completed ? 'bg-blue-500' : 'bg-white'}`}
-      ></div>
-      <div className="flex-grow">
-        <p className="font-semibold text-gray-800">{task.title}</p>
-        <div className="flex items-center text-sm text-gray-500 mt-1 space-x-4">
-          <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{projectName}</span>
-          <span className="text-gray-500">{task.due_date || 'Sin Fecha'}</span>
-        </div>
-      </div>
-      <div className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-        {userInitial}
-      </div>
-      <button onClick={handleDelete} className="text-gray-400 hover:text-red-500 transition-colors">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
-    </div>
-  );
+type Comment = {
+  id: number;
+  created_at: string;
+  content: string;
+  user_name: string | null;
+  task_id: number;
 };
 
-
-// Componente principal de la página
 export default function MyTasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
-    
-    const { data: tasksData, error: tasksError } = await supabase
-      .from('tasks')
-      .select('*, projects ( id, name )')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
-    
-    const { data: projectsData, error: projectsError } = await supabase
-      .from('projects')
-      .select('*');
-
+    const { data: tasksData, error: tasksError } = await supabase.from('tasks').select('*, projects ( id, name )').is('deleted_at', null).order('created_at', { ascending: false });
+    const { data: projectsData, error: projectsError } = await supabase.from('projects').select('*');
     if (tasksError) console.error('Error fetching tasks:', tasksError);
     else if (tasksData) setTasks(tasksData as Task[]);
-
     if (projectsError) console.error('Error fetching projects:', projectsError);
     else if (projectsData) setProjects(projectsData as Project[]);
-    
     setLoading(false);
   };
 
@@ -101,31 +54,22 @@ export default function MyTasksPage() {
     fetchData();
   }, []);
 
- // Reemplaza la vieja función handleAddTask con esta
-const handleAddTask = async (taskData: { title: string; projectId: number | null; dueDate: string | null; responsible: string | null }) => {
-  // Usamos la llamada RPC en lugar de .insert()
-  const { error } = await supabase.rpc('insert_task', {
-    new_title: taskData.title,
-    new_project_id: taskData.projectId,
-    new_due_date: taskData.dueDate,
-    new_responsible: taskData.responsible
-  });
-
-  if (error) {
-    console.error('Error adding task via RPC:', error);
-  } else {
-    await fetchData(); // Usamos la función que ya teníamos para refrescar todo
-  }
-};
+  const handleAddTask = async (taskData: { title: string; projectId: number | null; dueDate: string | null; responsible: string | null }) => {
+    const { error } = await supabase.rpc('insert_task', { new_title: taskData.title, new_project_id: taskData.projectId, new_due_date: taskData.dueDate, new_responsible: taskData.responsible });
+    if (error) console.error('Error adding task via RPC:', error);
+    else await fetchData();
+  };
 
   const handleTaskCompleted = async (taskToUpdate: Task) => {
-    setTasks(tasks.map(task => task.id === taskToUpdate.id ? taskToUpdate : task));
-    
-    const { error } = await supabase
-      .from('tasks')
-      .update({ completed: taskToUpdate.completed })
-      .eq('id', taskToUpdate.id);
-
+    const newCompletedStatus = !taskToUpdate.completed;
+    const updatedTasks = tasks.map(task => 
+      task.id === taskToUpdate.id ? { ...task, completed: newCompletedStatus } : task
+    );
+    setTasks(updatedTasks);
+    if (editingTask && editingTask.id === taskToUpdate.id) {
+      setEditingTask({ ...editingTask, completed: newCompletedStatus });
+    }
+    const { error } = await supabase.from('tasks').update({ completed: newCompletedStatus }).eq('id', taskToUpdate.id);
     if (error) {
       console.error('Error updating task:', error);
       await fetchData();
@@ -134,45 +78,64 @@ const handleAddTask = async (taskData: { title: string; projectId: number | null
 
   const handleDeleteTask = async (taskId: number) => {
     setTasks(tasks.filter(task => task.id !== taskId));
-
-    const { error } = await supabase
-      .from('tasks')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', taskId);
-
+    const { error } = await supabase.from('tasks').update({ deleted_at: new Date().toISOString() }).eq('id', taskId);
     if (error) {
       console.error('Error soft-deleting task:', error);
       await fetchData();
     }
   };
 
-// Reemplaza la vieja función handleUpdateTask con esta
-const handleUpdateTask = async (updatedData: {
-  title: string;
-  due_date: string | null;
-  project_id: number | null;
-  user_responsible: string | null;
-}) => {
-if (!editingTask) return;
+  const handleUpdateTask = async (updatedData: any) => {
+    if (!editingTask) return;
+    const { error } = await supabase.rpc('update_task_details', {
+      task_id: editingTask.id,
+      new_title: updatedData.title,
+      new_due_date: updatedData.due_date,
+      new_project_id: updatedData.project_id,
+      new_responsible: updatedData.user_responsible
+    });
+    if (error) {
+      console.error('Error updating task via RPC:', error);
+    } else {
+      await fetchData();
+    }
+    setEditingTask(null);
+  };
+  
+  const handleSelectTask = async (task: Task) => {
+    const { data: subtasksData, error: subtasksError } = await supabase.from('subtasks').select('*').eq('task_id', task.id).order('created_at');
+    if (subtasksError) console.error('Error fetching subtasks:', subtasksError);
+    else setSubtasks(subtasksData as Subtask[]);
 
-// Llamamos a nuestra nueva función RPC en lugar de .update()
-const { error } = await supabase.rpc('update_task_details', {
-  task_id: editingTask.id,
-  new_title: updatedData.title,
-  new_due_date: updatedData.due_date,
-  new_project_id: updatedData.project_id,
-  new_responsible: updatedData.user_responsible
-});
+    const { data: commentsData, error: commentsError } = await supabase.from('comments').select('*').eq('task_id', task.id).order('created_at');
+    if (commentsError) console.error('Error fetching comments:', commentsError);
+    else setComments(commentsData as Comment[]);
 
-if (error) {
-  console.error('Error updating task via RPC:', error);
-} else {
-  // Si tiene éxito, refrescamos los datos para ver el cambio
-  await fetchData();
-}
+    setEditingTask(task);
+  };
 
-setEditingTask(null); // Cerramos el modal
-};
+  const handleSubtaskAdd = async (subtaskData: { title: string; responsible: string | null; dueDate: string | null; }) => {
+    if (!editingTask) return;
+    const { data, error } = await supabase.from('subtasks').insert({ title: subtaskData.title, task_id: editingTask.id, user_responsible: subtaskData.responsible, due_date: subtaskData.dueDate }).select().single();
+    if (error) console.error('Error adding subtask:', error);
+    else if (data) setSubtasks([...subtasks, data as Subtask]);
+  };
+
+  const handleSubtaskToggle = async (subtaskId: number, newStatus: boolean) => {
+    setSubtasks(subtasks.map(st => st.id === subtaskId ? { ...st, is_completed: newStatus } : st));
+    const { error } = await supabase.from('subtasks').update({ is_completed: newStatus }).eq('id', subtaskId);
+    if (error) {
+      console.error('Error updating subtask:', error);
+      if (editingTask) await handleSelectTask(editingTask);
+    }
+  };
+  
+  const handleCommentAdd = async (content: string) => {
+    if (!editingTask) return;
+    const { data, error } = await supabase.from('comments').insert({ content: content, task_id: editingTask.id, user_name: 'Domingo' }).select().single();
+    if (error) console.error('Error adding comment:', error);
+    else if (data) setComments([...comments, data as Comment]);
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen font-sans">
@@ -191,7 +154,7 @@ setEditingTask(null); // Cerramos el modal
                 task={task} 
                 onUpdate={handleTaskCompleted} 
                 onDelete={handleDeleteTask}
-                onSelect={setEditingTask}
+                onSelect={handleSelectTask}
               />
             ))}
           </div>
@@ -200,15 +163,18 @@ setEditingTask(null); // Cerramos el modal
 
       <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>
         {editingTask && (
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Editar Tarea</h2>
-            <EditTaskForm
-              task={editingTask}
-              projects={projects}
-              onSave={handleUpdateTask}
-              onCancel={() => setEditingTask(null)}
-            />
-          </div>
+          <EditTaskForm
+            task={editingTask}
+            projects={projects}
+            subtasks={subtasks}
+            comments={comments}
+            onSave={handleUpdateTask}
+            onCancel={() => setEditingTask(null)}
+            onSubtaskAdd={handleSubtaskAdd}
+            onSubtaskToggle={handleSubtaskToggle}
+            onCommentAdd={handleCommentAdd}
+            onToggleComplete={handleTaskCompleted}
+          />
         )}
       </Modal>
     </div>

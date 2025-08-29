@@ -17,6 +17,24 @@ type Project = {
   description: string | null;
 };
 
+type Subtask = {
+  id: number;
+  title: string;
+  is_completed: boolean;
+  task_id: number;
+  description: string | null;
+  due_date: string | null;
+  user_responsible: string | null;
+};
+
+type Comment = {
+  id: number;
+  created_at: string;
+  content: string;
+  user_name: string | null;
+  task_id: number;
+};
+
 const KANBAN_COLUMNS = ['Por Hacer', 'En Progreso', 'Hecho'];
 
 export default function ProjectDetailPage() {
@@ -28,12 +46,10 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
 
-  const sensors = useSensors(useSensor(PointerSensor, {
-    activationConstraint: {
-      distance: 8,
-    },
-  }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const fetchProjectData = async () => {
     if (!projectId) return;
@@ -52,8 +68,15 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const handleTaskCompleted = async (taskToUpdate: Task) => {
-    setTasks(tasks.map(task => task.id === taskToUpdate.id ? taskToUpdate : task));
-    const { error } = await supabase.from('tasks').update({ completed: taskToUpdate.completed }).eq('id', taskToUpdate.id);
+    const newCompletedStatus = !taskToUpdate.completed;
+    const updatedTasks = tasks.map(task => 
+      task.id === taskToUpdate.id ? { ...task, completed: newCompletedStatus } : task
+    );
+    setTasks(updatedTasks);
+    if (editingTask && editingTask.id === taskToUpdate.id) {
+      setEditingTask({ ...editingTask, completed: newCompletedStatus });
+    }
+    const { error } = await supabase.from('tasks').update({ completed: newCompletedStatus }).eq('id', taskToUpdate.id);
     if (error) {
       console.error('Error updating task:', error);
       await fetchProjectData();
@@ -96,12 +119,10 @@ export default function ProjectDetailPage() {
     setActiveTask(null);
     const { active, over } = event;
     if (!over) return;
-
     const activeId = active.id as number;
     const overId = over.id as string;
     const activeTask = tasks.find(t => t.id === activeId);
-
-    if (activeTask && overId && activeTask.status !== overId && KANBAN_COLUMNS.includes(overId)) {
+    if (activeTask && activeTask.status !== overId && KANBAN_COLUMNS.includes(overId)) {
       setTasks(prevTasks => prevTasks.map(t => t.id === activeId ? { ...t, status: overId } : t));
       const { error } = await supabase.from('tasks').update({ status: overId }).eq('id', activeId);
       if (error) {
@@ -109,6 +130,39 @@ export default function ProjectDetailPage() {
         await fetchProjectData();
       }
     }
+  };
+
+  const handleSelectTask = async (task: Task) => {
+    const { data: subtasksData, error: subtasksError } = await supabase.from('subtasks').select('*').eq('task_id', task.id).order('created_at');
+    if (subtasksError) console.error('Error fetching subtasks:', subtasksError);
+    else setSubtasks(subtasksData as Subtask[]);
+    const { data: commentsData, error: commentsError } = await supabase.from('comments').select('*').eq('task_id', task.id).order('created_at');
+    if (commentsError) console.error('Error fetching comments:', commentsError);
+    else setComments(commentsData as Comment[]);
+    setEditingTask(task);
+  };
+
+  const handleSubtaskAdd = async (subtaskData: { title: string; responsible: string | null; dueDate: string | null; }) => {
+    if (!editingTask) return;
+    const { data, error } = await supabase.from('subtasks').insert({ title: subtaskData.title, task_id: editingTask.id, user_responsible: subtaskData.responsible, due_date: subtaskData.dueDate }).select().single();
+    if (error) console.error('Error adding subtask:', error);
+    else if (data) setSubtasks([...subtasks, data as Subtask]);
+  };
+
+  const handleSubtaskToggle = async (subtaskId: number, newStatus: boolean) => {
+    setSubtasks(subtasks.map(st => st.id === subtaskId ? { ...st, is_completed: newStatus } : st));
+    const { error } = await supabase.from('subtasks').update({ is_completed: newStatus }).eq('id', subtaskId);
+    if (error) {
+      console.error('Error updating subtask:', error);
+      if (editingTask) await handleSelectTask(editingTask);
+    }
+  };
+
+  const handleCommentAdd = async (content: string) => {
+    if (!editingTask) return;
+    const { data, error } = await supabase.from('comments').insert({ content: content, task_id: editingTask.id, user_name: 'Domingo' }).select().single();
+    if (error) console.error('Error adding comment:', error);
+    else if (data) setComments([...comments, data as Comment]);
   };
 
   if (loading) return <p className="text-center p-8">Cargando proyecto...</p>;
@@ -128,32 +182,30 @@ export default function ProjectDetailPage() {
             <h1 className="text-3xl font-bold text-gray-900 mt-2">{project.name}</h1>
             <p className="text-gray-600 mt-1">{project.description}</p>
           </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {KANBAN_COLUMNS.map(status => (
-              <KanbanColumn
-                key={status}
-                status={status}
-                tasks={tasksByStatus[status] || []}
-                onUpdate={handleTaskCompleted}
-                onDelete={handleDeleteTask}
-                onSelect={setEditingTask}
-              />
+              <KanbanColumn key={status} status={status} tasks={tasksByStatus[status] || []} onUpdate={handleTaskCompleted} onDelete={handleDeleteTask} onSelect={handleSelectTask} />
             ))}
           </div>
         </main>
-
         <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>
           {editingTask && (
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Editar Tarea</h2>
-              <EditTaskForm task={editingTask} projects={project ? [project] : []} onSave={handleUpdateTask} onCancel={() => setEditingTask(null)} />
-            </div>
+            <EditTaskForm
+              task={editingTask}
+              projects={project ? [project] : []}
+              subtasks={subtasks}
+              comments={comments}
+              onSave={handleUpdateTask}
+              onCancel={() => setEditingTask(null)}
+              onSubtaskAdd={handleSubtaskAdd}
+              onSubtaskToggle={handleSubtaskToggle}
+              onCommentAdd={handleCommentAdd}
+              onToggleComplete={handleTaskCompleted}
+            />
           )}
         </Modal>
-
         <DragOverlay>
-          {activeTask ? <TaskCard task={activeTask} onUpdate={()=>{}} onDelete={()=>{}} onSelect={()=>{}} /> : null}
+            {activeTask ? <TaskCard task={activeTask} onUpdate={()=>{}} onDelete={()=>{}} onSelect={()=>{}} /> : null}
         </DragOverlay>
       </div>
     </DndContext>

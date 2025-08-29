@@ -2,7 +2,7 @@
 
 import { useEffect, useState, FormEvent } from 'react'
 import Link from 'next/link'
-import { supabase } from '../../lib/supabaseClient' // Ruta corregida
+import { supabase } from '../../lib/supabaseClient'
 
 type Project = {
   id: number;
