@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
-import AddTaskForm from '../components/AddTaskForm'
-import Modal from '../components/Modal'
-import EditTaskForm from '../components/EditTaskForm'
-import TaskCard, { Task } from '../components/TaskCard'
+import { supabase } from '@/lib/supabaseClient'
+import AddTaskForm from '@/components/AddTaskForm'
+import Modal from '@/components/Modal'
+import EditTaskForm from '@/components/EditTaskForm'
+import TaskCard, { Task } from '@/components/TaskCard'
+import AuthGuard from '@/components/AuthGuard'
 
 // Tipos de datos
 type Project = {
@@ -90,6 +91,7 @@ export default function MyTasksPage() {
     const { error } = await supabase.rpc('update_task_details', {
       task_id: editingTask.id,
       new_title: updatedData.title,
+      new_description: updatedData.description,
       new_due_date: updatedData.due_date,
       new_project_id: updatedData.project_id,
       new_responsible: updatedData.user_responsible
@@ -138,7 +140,7 @@ export default function MyTasksPage() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans">
+    <AuthGuard>
       <main className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Mis Tareas</h1>
         
@@ -177,6 +179,6 @@ export default function MyTasksPage() {
           />
         )}
       </Modal>
-    </div>
+    </AuthGuard>
   );
 }

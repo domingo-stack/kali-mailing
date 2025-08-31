@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '../../../lib/supabaseClient'
-import TaskCard, { Task } from '../../../components/TaskCard'
-import Modal from '../../../components/Modal'
-import EditTaskForm from '../../../components/EditTaskForm'
-import KanbanColumn from '../../../components/KanbanColumn'
+import { supabase } from '@/lib/supabaseClient'
+import TaskCard, { Task } from '@/components/TaskCard'
+import Modal from '@/components/Modal'
+import EditTaskForm from '@/components/EditTaskForm'
+import KanbanColumn from '@/components/KanbanColumn'
+import AuthGuard from '@/components/AuthGuard'
 
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverlay } from '@dnd-kit/core'
 
@@ -69,9 +70,7 @@ export default function ProjectDetailPage() {
 
   const handleTaskCompleted = async (taskToUpdate: Task) => {
     const newCompletedStatus = !taskToUpdate.completed;
-    const updatedTasks = tasks.map(task => 
-      task.id === taskToUpdate.id ? { ...task, completed: newCompletedStatus } : task
-    );
+    const updatedTasks = tasks.map(task => task.id === taskToUpdate.id ? { ...task, completed: newCompletedStatus } : task);
     setTasks(updatedTasks);
     if (editingTask && editingTask.id === taskToUpdate.id) {
       setEditingTask({ ...editingTask, completed: newCompletedStatus });
@@ -97,7 +96,7 @@ export default function ProjectDetailPage() {
     const { error } = await supabase.rpc('update_task_details', {
       task_id: editingTask.id,
       new_title: updatedData.title,
-      new_description: updatedData.description, // <-- Añadimos el nuevo campo
+      new_description: updatedData.description,
       new_due_date: updatedData.due_date,
       new_project_id: updatedData.project_id,
       new_responsible: updatedData.user_responsible
@@ -109,7 +108,7 @@ export default function ProjectDetailPage() {
     }
     setEditingTask(null);
   };
-
+  
   const handleDragStart = (event: DragEndEvent) => {
     const { active } = event;
     const task = tasks.find(t => t.id === active.id);
@@ -158,7 +157,7 @@ export default function ProjectDetailPage() {
       if (editingTask) await handleSelectTask(editingTask);
     }
   };
-
+  
   const handleCommentAdd = async (content: string) => {
     if (!editingTask) return;
     const { data, error } = await supabase.from('comments').insert({ content: content, task_id: editingTask.id, user_name: 'Domingo' }).select().single();
@@ -166,49 +165,45 @@ export default function ProjectDetailPage() {
     else if (data) setComments([...comments, data as Comment]);
   };
 
-  if (loading) return <p className="text-center p-8">Cargando proyecto...</p>;
-  if (!project) return <p className="text-center p-8">Proyecto no encontrado.</p>;
-
-  const tasksByStatus = KANBAN_COLUMNS.reduce((acc, status) => {
-    acc[status] = tasks.filter(task => task.status === status);
-    return acc;
-  }, {} as Record<string, Task[]>);
-
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="bg-gray-50 min-h-screen font-sans">
-        <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-          <div className="mb-8">
-            <Link href="/projects" className="text-blue-600 hover:underline">&larr; Volver a todos los proyectos</Link>
-            <h1 className="text-3xl font-bold text-gray-900 mt-2">{project.name}</h1>
-            <p className="text-gray-600 mt-1">{project.description}</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {KANBAN_COLUMNS.map(status => (
-              <KanbanColumn key={status} status={status} tasks={tasksByStatus[status] || []} onUpdate={handleTaskCompleted} onDelete={handleDeleteTask} onSelect={handleSelectTask} />
-            ))}
-          </div>
-        </main>
-        <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>
-          {editingTask && (
-            <EditTaskForm
-              task={editingTask}
-              projects={project ? [project] : []}
-              subtasks={subtasks}
-              comments={comments}
-              onSave={handleUpdateTask}
-              onCancel={() => setEditingTask(null)}
-              onSubtaskAdd={handleSubtaskAdd}
-              onSubtaskToggle={handleSubtaskToggle}
-              onCommentAdd={handleCommentAdd}
-              onToggleComplete={handleTaskCompleted}
-            />
-          )}
-        </Modal>
-        <DragOverlay>
-            {activeTask ? <TaskCard task={activeTask} onUpdate={()=>{}} onDelete={()=>{}} onSelect={()=>{}} /> : null}
-        </DragOverlay>
-      </div>
-    </DndContext>
+    <AuthGuard>
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div className="bg-gray-50 min-h-screen font-sans">
+          <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+            <div className="mb-8">
+              <Link href="/projects" className="text-blue-600 hover:underline">&larr; Volver a todos los proyectos</Link>
+              <h1 className="text-3xl font-bold text-gray-900 mt-2">{project?.name || 'Cargando...'}</h1>
+              <p className="text-gray-600 mt-1">{project?.description}</p>
+            </div>
+            {loading ? <p>Cargando tareas...</p> : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {KANBAN_COLUMNS.map(status => (
+                  <KanbanColumn key={status} status={status} tasks={tasks.filter(t => t.status === status) || []} onUpdate={handleTaskCompleted} onDelete={handleDeleteTask} onSelect={handleSelectTask} />
+                ))}
+              </div>
+            )}
+          </main>
+          <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>
+            {editingTask && (
+              <EditTaskForm
+                task={editingTask}
+                projects={project ? [project] : []}
+                subtasks={subtasks}
+                comments={comments}
+                onSave={handleUpdateTask}
+                onCancel={() => setEditingTask(null)}
+                onSubtaskAdd={handleSubtaskAdd}
+                onSubtaskToggle={handleSubtaskToggle}
+                onCommentAdd={handleCommentAdd}
+                onToggleComplete={handleTaskCompleted}
+              />
+            )}
+          </Modal>
+          <DragOverlay>
+              {activeTask ? <TaskCard task={activeTask} onUpdate={()=>{}} onDelete={()=>{}} onSelect={()=>{}} /> : null}
+          </DragOverlay>
+        </div>
+      </DndContext>
+    </AuthGuard>
   );
 }

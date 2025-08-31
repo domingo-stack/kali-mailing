@@ -3,6 +3,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
+import AuthGuard from '../../components/AuthGuard'
 
 type Project = {
   id: number;
@@ -56,7 +57,7 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans">
+    <AuthGuard>
       <main className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Gestión de Proyectos</h1>
 
@@ -110,6 +111,6 @@ export default function ProjectsPage() {
           )}
         </div>
       </main>
-    </div>
+    </AuthGuard>
   );
 }
