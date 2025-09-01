@@ -7,32 +7,15 @@ import Modal from '@/components/Modal'
 import EditTaskForm from '@/components/EditTaskForm'
 import TaskCard, { Task } from '@/components/TaskCard'
 import AuthGuard from '@/components/AuthGuard'
+import { useAuth } from '@/context/AuthContext'
 
 // Tipos de datos
-type Project = {
-  id: number;
-  name: string;
-};
-
-type Subtask = {
-  id: number;
-  title: string;
-  is_completed: boolean;
-  task_id: number;
-  description: string | null;
-  due_date: string | null;
-  user_responsible: string | null;
-};
-
-type Comment = {
-  id: number;
-  created_at: string;
-  content: string;
-  user_name: string | null;
-  task_id: number;
-};
+type Project = { id: number; name: string; };
+type Subtask = { id: number; title: string; is_completed: boolean; task_id: number; description: string | null; due_date: string | null; user_responsible: string | null; };
+type Comment = { id: number; created_at: string; content: string; user_name: string | null; task_id: number; };
 
 export default function MyTasksPage() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,9 +24,10 @@ export default function MyTasksPage() {
   const [comments, setComments] = useState<Comment[]>([]);
 
   const fetchData = async () => {
+    if (!user) return;
     setLoading(true);
     const { data: tasksData, error: tasksError } = await supabase.from('tasks').select('*, projects ( id, name )').is('deleted_at', null).order('created_at', { ascending: false });
-    const { data: projectsData, error: projectsError } = await supabase.from('projects').select('*');
+    const { data: projectsData, error: projectsError } = await supabase.from('projects').select('*').order('name');
     if (tasksError) console.error('Error fetching tasks:', tasksError);
     else if (tasksData) setTasks(tasksData as Task[]);
     if (projectsError) console.error('Error fetching projects:', projectsError);
@@ -52,25 +36,35 @@ export default function MyTasksPage() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) fetchData();
+  }, [user]);
 
   const handleAddTask = async (taskData: { title: string; projectId: number | null; dueDate: string | null; responsible: string | null }) => {
+    if (!user) return;
+    const { data: teamData, error: teamError } = await supabase.from('team_members').select('team_id').eq('user_id', user.id).single();
+    if (teamError || !teamData) {
+      console.error('No se pudo encontrar el equipo para crear la tarea');
+      return;
+    }
     const { error } = await supabase.rpc('insert_task', { new_title: taskData.title, new_project_id: taskData.projectId, new_due_date: taskData.dueDate, new_responsible: taskData.responsible });
     if (error) console.error('Error adding task via RPC:', error);
     else await fetchData();
   };
 
   const handleTaskCompleted = async (taskToUpdate: Task) => {
-    const newCompletedStatus = !taskToUpdate.completed;
-    const updatedTasks = tasks.map(task => 
-      task.id === taskToUpdate.id ? { ...task, completed: newCompletedStatus } : task
-    );
-    setTasks(updatedTasks);
+    // El objeto taskToUpdate ya viene con el estado 'completed' correcto desde la tarjeta
+    // por lo que lo usamos directamente.
+    setTasks(tasks.map(task => task.id === taskToUpdate.id ? taskToUpdate : task));
+    
     if (editingTask && editingTask.id === taskToUpdate.id) {
-      setEditingTask({ ...editingTask, completed: newCompletedStatus });
+      setEditingTask(taskToUpdate);
     }
-    const { error } = await supabase.from('tasks').update({ completed: newCompletedStatus }).eq('id', taskToUpdate.id);
+
+    const { error } = await supabase
+      .from('tasks')
+      .update({ completed: taskToUpdate.completed }) // Usamos el valor que llega
+      .eq('id', taskToUpdate.id);
+
     if (error) {
       console.error('Error updating task:', error);
       await fetchData();
@@ -96,11 +90,8 @@ export default function MyTasksPage() {
       new_project_id: updatedData.project_id,
       new_responsible: updatedData.user_responsible
     });
-    if (error) {
-      console.error('Error updating task via RPC:', error);
-    } else {
-      await fetchData();
-    }
+    if (error) console.error('Error updating task via RPC:', error);
+    else await fetchData();
     setEditingTask(null);
   };
   
@@ -108,11 +99,9 @@ export default function MyTasksPage() {
     const { data: subtasksData, error: subtasksError } = await supabase.from('subtasks').select('*').eq('task_id', task.id).order('created_at');
     if (subtasksError) console.error('Error fetching subtasks:', subtasksError);
     else setSubtasks(subtasksData as Subtask[]);
-
     const { data: commentsData, error: commentsError } = await supabase.from('comments').select('*').eq('task_id', task.id).order('created_at');
     if (commentsError) console.error('Error fetching comments:', commentsError);
     else setComments(commentsData as Comment[]);
-
     setEditingTask(task);
   };
 
@@ -133,8 +122,8 @@ export default function MyTasksPage() {
   };
   
   const handleCommentAdd = async (content: string) => {
-    if (!editingTask) return;
-    const { data, error } = await supabase.from('comments').insert({ content: content, task_id: editingTask.id, user_name: 'Domingo' }).select().single();
+    if (!editingTask || !user) return;
+    const { data, error } = await supabase.from('comments').insert({ content: content, task_id: editingTask.id, user_name: user.email }).select().single();
     if (error) console.error('Error adding comment:', error);
     else if (data) setComments([...comments, data as Comment]);
   };
@@ -143,40 +132,18 @@ export default function MyTasksPage() {
     <AuthGuard>
       <main className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Mis Tareas</h1>
-        
         <AddTaskForm onAddTask={handleAddTask} projects={projects} />
-
-        {loading ? (
-          <p>Cargando tareas...</p>
-        ) : (
+        {loading ? <p>Cargando tareas...</p> : (
           <div className="space-y-3">
             {tasks.map(task => (
-              <TaskCard 
-                key={task.id} 
-                task={task} 
-                onUpdate={handleTaskCompleted} 
-                onDelete={handleDeleteTask}
-                onSelect={handleSelectTask}
-              />
+              <TaskCard key={task.id} task={task} onUpdate={handleTaskCompleted} onDelete={handleDeleteTask} onSelect={handleSelectTask} />
             ))}
           </div>
         )}
       </main>
-
       <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>
         {editingTask && (
-          <EditTaskForm
-            task={editingTask}
-            projects={projects}
-            subtasks={subtasks}
-            comments={comments}
-            onSave={handleUpdateTask}
-            onCancel={() => setEditingTask(null)}
-            onSubtaskAdd={handleSubtaskAdd}
-            onSubtaskToggle={handleSubtaskToggle}
-            onCommentAdd={handleCommentAdd}
-            onToggleComplete={handleTaskCompleted}
-          />
+          <EditTaskForm task={editingTask} projects={projects} subtasks={subtasks} comments={comments} onSave={handleUpdateTask} onCancel={() => setEditingTask(null)} onSubtaskAdd={handleSubtaskAdd} onSubtaskToggle={handleSubtaskToggle} onCommentAdd={handleCommentAdd} onToggleComplete={handleTaskCompleted} />
         )}
       </Modal>
     </AuthGuard>

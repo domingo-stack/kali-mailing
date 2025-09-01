@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import RichTextEditor from './RichTextEditor' // Importamos nuestro nuevo editor
+import RichTextEditor from './RichTextEditor'
+import { Task } from './TaskCard'
 
-// Tipos de datos que usa este componente
+// Tipos de datos locales
 type Comment = { id: number; created_at: string; content: string; user_name: string | null; };
 type Subtask = { id: number; title: string; is_completed: boolean; task_id: number; description: string | null; due_date: string | null; user_responsible: string | null; };
 type Project = { id: number; name: string; };
-type Task = { id: number; title: string; description: string | null; due_date: string | null; completed: boolean; user_responsible: string | null; status: string; projects: { id: number; name: string; } | null; };
 
 // Propiedades que el formulario de edición recibe
 type EditTaskFormProps = {
@@ -82,9 +82,8 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
   return (
     <div className="relative p-6">
        <button onClick={onCancel} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 z-10">
-        <svg xmlns="http://www.w.3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
-
       <div className="flex items-center mb-6 pb-4 border-b">
         <button
           onClick={() => onToggleComplete(task)}
@@ -98,27 +97,14 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
           {isCompleted ? 'Finalizada' : 'Marcar como finalizada'}
         </button>
       </div>
-
       <form onSubmit={handleSubmit} className={`space-y-4 ${disabledClass}`}>
           <div className={`text-2xl font-bold ${isCompleted ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full font-bold text-2xl border-none focus:ring-0 p-0 bg-transparent"
-              disabled={isCompleted}
-            />
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full font-bold text-2xl border-none focus:ring-0 p-0 bg-transparent" disabled={isCompleted} />
           </div>
-          
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Descripción</label>
-            <RichTextEditor
-              content={description}
-              onChange={(newDescription) => setDescription(newDescription)}
-              disabled={isCompleted}
-            />
+            <RichTextEditor content={description} onChange={(newDescription) => setDescription(newDescription)} disabled={isCompleted} />
           </div>
-
           <div className="grid grid-cols-2 gap-x-8 gap-y-4 pt-4">
             <div>
               <label className="block text-sm font-medium text-gray-500">Responsable</label>
@@ -136,7 +122,6 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
               </select>
             </div>
           </div>
-
           <div className="space-y-2 pt-4 border-t">
             <label className="block text-sm font-medium text-gray-700">Sub-tareas</label>
             <div className="max-h-40 overflow-y-auto pr-2 space-y-2">
@@ -153,7 +138,7 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
               })}
             </div>
             <div className="space-y-2 pt-2 border-t border-dashed">
-              <input type="text" value={newSubtaskTitle} onChange={(e) => setNewSubtaskTitle(e.target.value)} placeholder="Título nueva sub-tarea" className="w-full border-gray-300 rounded-md shadow-sm sm:text-sm" />
+               <input type="text" value={newSubtaskTitle} onChange={(e) => setNewSubtaskTitle(e.target.value)} placeholder="Título nueva sub-tarea" className="w-full border-gray-300 rounded-md shadow-sm sm:text-sm" />
               <div className="flex items-center gap-2">
                 <input type="text" value={newSubtaskResponsible} onChange={(e) => setNewSubtaskResponsible(e.target.value)} placeholder="Responsable (opcional)" className="flex-grow border-gray-300 rounded-md shadow-sm sm:text-sm" />
                 <input type="date" value={newSubtaskDueDate} onChange={(e) => setNewSubtaskDueDate(e.target.value)} className="border-gray-300 rounded-md shadow-sm sm:text-sm" />
@@ -161,7 +146,6 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
               </div>
             </div>
           </div>
-
           <div className="space-y-2 pt-4 border-t">
             <label className="block text-sm font-medium text-gray-700">Comentarios</label>
             <div className="max-h-40 overflow-y-auto pr-2 space-y-3 bg-gray-50 p-3 rounded-md">
@@ -178,7 +162,6 @@ export default function EditTaskForm({ task, projects, subtasks = [], comments =
               <button type="button" onClick={handleAddComment} className="px-4 py-2 text-sm bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700" disabled={isCompleted}>Comentar</button>
             </div>
           </div>
-          
           <div className="flex justify-end space-x-3 pt-4 border-t">
             <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancelar</button>
             <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700" disabled={isCompleted}>Guardar Cambios</button>

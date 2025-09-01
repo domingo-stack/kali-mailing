@@ -6,7 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 export type Task = {
   id: number;
   title: string;
-  description: string | null; // <-- La línea añadida
+  description: string | null;
   due_date: string | null;
   completed: boolean;
   user_responsible: string | null;

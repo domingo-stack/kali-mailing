@@ -1,12 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useAuth } from '../context/AuthContext'
-import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '@/context/AuthContext'
+import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
 export default function Navbar() {
   const { user } = useAuth()
+  console.log('ID del usuario actual en la app:', user?.id);
   const router = useRouter()
 
   const handleLogout = async () => {

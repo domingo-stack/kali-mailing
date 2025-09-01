@@ -9,41 +9,23 @@ import Modal from '@/components/Modal'
 import EditTaskForm from '@/components/EditTaskForm'
 import KanbanColumn from '@/components/KanbanColumn'
 import AuthGuard from '@/components/AuthGuard'
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverlay, rectIntersection } from '@dnd-kit/core'
+import { useAuth } from '@/context/AuthContext'
 
-import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverlay } from '@dnd-kit/core'
-
-type Project = {
-  id: number;
-  name: string;
-  description: string | null;
-};
-
-type Subtask = {
-  id: number;
-  title: string;
-  is_completed: boolean;
-  task_id: number;
-  description: string | null;
-  due_date: string | null;
-  user_responsible: string | null;
-};
-
-type Comment = {
-  id: number;
-  created_at: string;
-  content: string;
-  user_name: string | null;
-  task_id: number;
-};
+// Tipos de datos locales
+type Project = { id: number; name: string; description: string | null; };
+type Subtask = { id: number; title: string; is_completed: boolean; task_id: number; description: string | null; due_date: string | null; user_responsible: string | null; };
+type Comment = { id: number; created_at: string; content: string; user_name: string | null; task_id: number; };
 
 const KANBAN_COLUMNS = ['Por Hacer', 'En Progreso', 'Hecho'];
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id;
-
+  const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -53,29 +35,46 @@ export default function ProjectDetailPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const fetchProjectData = async () => {
-    if (!projectId) return;
+    if (!projectId || !user) return;
     setLoading(true);
+    
+    // 1. Buscamos el equipo del usuario
+    const { data: teamData, error: teamError } = await supabase.from('team_members').select('team_id').eq('user_id', user.id).single();
+    if (teamError || !teamData) {
+      console.error('Error al buscar equipo:', teamError);
+      setLoading(false);
+      return;
+    }
+    const currentTeamId = teamData.team_id;
+
+    // 2. Buscamos los detalles del proyecto actual
     const { data: projectData, error: projectError } = await supabase.from('projects').select('*').eq('id', projectId).single();
-    const { data: tasksData, error: tasksError } = await supabase.from('tasks').select('*, projects ( id, name )').eq('project_id', projectId).is('deleted_at', null).order('created_at', { ascending: false });
     if (projectError) console.error('Error fetching project details:', projectError);
     else setProject(projectData as Project);
+
+    // 3. Buscamos TODOS los proyectos del equipo (para el desplegable)
+    const { data: allProjectsData, error: allProjectsError } = await supabase.from('projects').select('*').eq('team_id', currentTeamId);
+    if (allProjectsError) console.error('Error fetching all projects:', allProjectsError);
+    else setAllProjects(allProjectsData as Project[]);
+
+    // 4. Buscamos las tareas de ESTE proyecto
+    const { data: tasksData, error: tasksError } = await supabase.from('tasks').select('*, projects ( id, name )').eq('project_id', projectId).is('deleted_at', null).order('created_at', { ascending: false });
     if (tasksError) console.error('Error fetching tasks for project:', tasksError);
     else if (tasksData) setTasks(tasksData as Task[]);
+
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchProjectData();
-  }, [projectId]);
+    if (user) fetchProjectData();
+  }, [projectId, user]);
 
   const handleTaskCompleted = async (taskToUpdate: Task) => {
-    const newCompletedStatus = !taskToUpdate.completed;
-    const updatedTasks = tasks.map(task => task.id === taskToUpdate.id ? { ...task, completed: newCompletedStatus } : task);
-    setTasks(updatedTasks);
+    setTasks(tasks.map(task => task.id === taskToUpdate.id ? taskToUpdate : task));
     if (editingTask && editingTask.id === taskToUpdate.id) {
-      setEditingTask({ ...editingTask, completed: newCompletedStatus });
+      setEditingTask(taskToUpdate);
     }
-    const { error } = await supabase.from('tasks').update({ completed: newCompletedStatus }).eq('id', taskToUpdate.id);
+    const { error } = await supabase.from('tasks').update({ completed: taskToUpdate.completed }).eq('id', taskToUpdate.id);
     if (error) {
       console.error('Error updating task:', error);
       await fetchProjectData();
@@ -101,11 +100,8 @@ export default function ProjectDetailPage() {
       new_project_id: updatedData.project_id,
       new_responsible: updatedData.user_responsible
     });
-    if (error) {
-      console.error('Error updating task via RPC:', error);
-    } else {
-      await fetchProjectData();
-    }
+    if (error) console.error('Error updating task via RPC:', error);
+    else await fetchProjectData();
     setEditingTask(null);
   };
   
@@ -159,15 +155,18 @@ export default function ProjectDetailPage() {
   };
   
   const handleCommentAdd = async (content: string) => {
-    if (!editingTask) return;
-    const { data, error } = await supabase.from('comments').insert({ content: content, task_id: editingTask.id, user_name: 'Domingo' }).select().single();
+    if (!editingTask || !user) return;
+    const { data, error } = await supabase.from('comments').insert({ content: content, task_id: editingTask.id, user_name: user.email }).select().single();
     if (error) console.error('Error adding comment:', error);
     else if (data) setComments([...comments, data as Comment]);
   };
 
+  if (loading) return <p className="text-center p-8">Cargando proyecto...</p>;
+  if (!project) return <p className="text-center p-8">Proyecto no encontrado.</p>;
+
   return (
     <AuthGuard>
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="bg-gray-50 min-h-screen font-sans">
           <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
             <div className="mb-8">
@@ -175,19 +174,17 @@ export default function ProjectDetailPage() {
               <h1 className="text-3xl font-bold text-gray-900 mt-2">{project?.name || 'Cargando...'}</h1>
               <p className="text-gray-600 mt-1">{project?.description}</p>
             </div>
-            {loading ? <p>Cargando tareas...</p> : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {KANBAN_COLUMNS.map(status => (
-                  <KanbanColumn key={status} status={status} tasks={tasks.filter(t => t.status === status) || []} onUpdate={handleTaskCompleted} onDelete={handleDeleteTask} onSelect={handleSelectTask} />
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {KANBAN_COLUMNS.map(status => (
+                <KanbanColumn key={status} id={status} title={status} tasks={tasks.filter(t => t.status === status) || []} onUpdate={handleTaskCompleted} onDelete={handleDeleteTask} onSelect={handleSelectTask} />
+              ))}
+            </div>
           </main>
           <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>
             {editingTask && (
               <EditTaskForm
                 task={editingTask}
-                projects={project ? [project] : []}
+                projects={allProjects}
                 subtasks={subtasks}
                 comments={comments}
                 onSave={handleUpdateTask}

@@ -1,28 +1,32 @@
 'use client'
 
+import React from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import TaskCard, { Task } from './TaskCard';
 
 type KanbanColumnProps = {
-  status: string;
+  id: string;
+  title: string;
   tasks: Task[];
   onUpdate: (task: Task) => void;
   onDelete: (taskId: number) => void;
   onSelect: (task: Task) => void;
 };
 
-export default function KanbanColumn({ status, tasks, onUpdate, onDelete, onSelect }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: status });
+export default function KanbanColumn({ id, title, tasks, onUpdate, onDelete, onSelect }: KanbanColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id });
 
-  // Lógica para cambiar el color de fondo si una tarea está sobre la columna
   const columnBackgroundColor = isOver ? 'bg-blue-100' : 'bg-gray-100';
 
   return (
-    <div ref={setNodeRef} className={`rounded-lg p-4 flex flex-col transition-colors ${columnBackgroundColor}`}>
-      <h2 className="font-bold text-lg mb-4 text-gray-700">{status} ({tasks.length})</h2>
+    <div
+      ref={setNodeRef}
+      className={`rounded-lg p-4 flex flex-col transition-colors ${columnBackgroundColor}`}
+    >
+      <h2 className="font-bold text-lg mb-4 text-gray-700">{title} ({tasks.length})</h2>
       
-      <SortableContext items={tasks.map(t => t.id)} id={status} strategy={verticalListSortingStrategy}>
+      <SortableContext items={tasks} strategy={verticalListSortingStrategy}>
         <div className="space-y-4 flex-grow min-h-[100px]">
           {tasks.length > 0 ? (
             tasks.map(task => (
