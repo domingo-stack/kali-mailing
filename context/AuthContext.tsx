@@ -1,58 +1,59 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import type { Session, User } from '@supabase/supabase-js'
 
-// Creamos el contexto que almacenará la información de la sesión
-const AuthContext = createContext<{ session: Session | null; user: User | null }>({
+// El contexto solo se preocupará por la sesión y el estado de carga inicial.
+const AuthContext = createContext<{ 
+  session: Session | null; 
+  user: User | null; 
+  isLoading: boolean;
+}>({
   session: null,
   user: null,
+  isLoading: true,
 });
 
-// Creamos el "Proveedor", un componente que envolverá nuestra aplicación
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Esta función se ejecuta una vez para obtener la sesión inicial
-    const getInitialSession = async () => {
+    // Verificamos la sesión inicial UNA SOLA VEZ.
+    const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
-    };
+      setIsLoading(false);
+    }
+    checkInitialSession();
 
-    getInitialSession();
-
-    // Esto escucha los cambios en el estado de autenticación (login, logout)
+    // Escuchamos cambios (login/logout) y solo actualizamos la sesión.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
     });
 
-    // Limpiamos la suscripción cuando el componente se desmonta
     return () => {
       subscription.unsubscribe();
     };
   }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     session,
     user,
-  };
+    isLoading,
+  }), [session, user, isLoading]);
 
-  // No mostramos la app hasta que sepamos si hay una sesión o no
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }
 
-// Creamos un "hook" personalizado para acceder fácilmente a la información del usuario
 export function useAuth() {
   return useContext(AuthContext);
 }

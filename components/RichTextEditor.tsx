@@ -2,8 +2,8 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import { useEffect } from 'react'
 
-// La barra de herramientas para el editor
 const Toolbar = ({ editor }: { editor: any }) => {
   if (!editor) {
     return null
@@ -13,7 +13,7 @@ const Toolbar = ({ editor }: { editor: any }) => {
     `p-2 rounded-md transition-colors ${isActive ? 'bg-gray-300' : 'hover:bg-gray-200'}`;
 
   return (
-    <div className="border border-gray-300 rounded-t-lg p-2 flex items-center flex-wrap gap-2 bg-gray-50">
+    <div className="border-b border-gray-300 p-2 flex items-center flex-wrap gap-2 bg-gray-50">
       <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={buttonClass(editor.isActive('bold'))}>
         <span className="font-bold">B</span>
       </button>
@@ -30,26 +30,37 @@ const Toolbar = ({ editor }: { editor: any }) => {
   )
 }
 
-// El componente del editor
 const RichTextEditor = ({ content, onChange, disabled }: { content: string, onChange: (newContent: string) => void, disabled: boolean }) => {
   const editor = useEditor({
     extensions: [StarterKit],
     content: content,
     editable: !disabled,
-    immediatelyRender: false,
+    // --- LA CORRECCIÓN ESTÁ AQUÍ ---
+    immediatelyRender: false, // Evita el error de hidratación en Next.js
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
+      onChange(editor.isEmpty ? '' : editor.getHTML())
     },
     editorProps: {
       attributes: {
-        // Añadimos las clases de prose para que tailwind aplique los estilos
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl m-5 focus:outline-none',
+        class: 'min-h-[120px] w-full p-4 focus:outline-none',
       },
     }
   })
 
+  useEffect(() => {
+    if (editor && editor.getHTML() !== content) {
+      editor.commands.setContent(content, { emitUpdate: false });
+    }
+  }, [content, editor]);
+  
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!disabled);
+    }
+  }, [disabled, editor]);
+
   return (
-    <div className={`border border-gray-300 rounded-lg ${disabled ? 'bg-gray-100' : 'bg-white'}`}>
+    <div className={`border border-gray-300 rounded-lg overflow-hidden ${disabled ? 'bg-gray-100' : 'bg-white'}`}>
       {!disabled && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
     </div>

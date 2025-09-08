@@ -1,91 +1,106 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+import RichTextEditor from './RichTextEditor'
 
-type Project = {
-  id: number;
-  name: string;
-};
+type TeamMember = { user_id: string; email: string; role: string; };
+type Project = { id: number; name: string; };
 
 type AddTaskFormProps = {
   onAddTask: (taskData: { 
-    title: string; 
+    title: string;
+    description: string;
     projectId: number | null; 
-    dueDate: string | null; 
-    responsible: string | null 
+    dueDate: string | null;
+    assigneeId: string | null;
   }) => Promise<void>;
   projects: Project[];
+  onCancel: () => void; // <-- NUEVO
 };
 
-export default function AddTaskForm({ onAddTask, projects }: AddTaskFormProps) {
+export default function AddTaskForm({ onAddTask, projects, onCancel }: AddTaskFormProps) {
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [selectedProject, setSelectedProject] = useState<number | ''>('');
   const [dueDate, setDueDate] = useState('');
-  const [responsible, setResponsible] = useState('');
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | ''>('');
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(false); // Estado de carga
+
+  useEffect(() => {
+    async function fetchTeamMembers() {
+      const { data, error } = await supabase.rpc('get_team_members');
+      if (error) console.error("Error fetching team members:", error);
+      else if (data) setTeamMembers(data);
+    }
+    fetchTeamMembers();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (title.trim()) {
-      const taskData = {
-        title: title.trim(),
-        projectId: selectedProject === '' ? null : Number(selectedProject),
-        dueDate: dueDate === '' ? null : dueDate,
-        responsible: responsible.trim() === '' ? null : responsible.trim()
-      };
-      await onAddTask(taskData);
-      
-      setTitle('');
-      setSelectedProject('');
-      setDueDate('');
-      setResponsible('');
-    }
+    if (!title.trim()) return;
+    setLoading(true);
+    const taskData = {
+      title: title.trim(),
+      description: description,
+      projectId: selectedProject === '' ? null : Number(selectedProject),
+      dueDate: dueDate === '' ? null : dueDate,
+      assigneeId: selectedAssigneeId === '' ? null : selectedAssigneeId
+    };
+    await onAddTask(taskData);
+    // No limpiamos el formulario aquí, ya que el modal se cerrará
+    setLoading(false);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mb-8 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-      <div className="flex flex-col gap-4">
+    <div className="relative p-6">
+      {/* --- NUEVO: Botón 'X' para cerrar --- */}
+      <button onClick={onCancel} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+
+      <h2 className="text-xl font-bold mb-4">Crear Nueva Tarea</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="¿Qué necesitas hacer?"
-          className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          className="w-full border-gray-300 rounded-md shadow-sm"
           required
         />
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 items-center gap-4">
-          <input
-            type="text"
-            value={responsible}
-            onChange={(e) => setResponsible(e.target.value)}
-            placeholder="Responsable (ej: CEO)"
-            className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-          <select
-            value={selectedProject}
-            onChange={(e) => setSelectedProject(Number(e.target.value))}
-            className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          >
-            <option value="">Sin Proyecto</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
+        
+        <div>
+          <label className="text-sm font-medium text-gray-500">Descripción</label>
+          <RichTextEditor content={description} onChange={setDescription} disabled={false} />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-4">
+          <select value={selectedAssigneeId} onChange={(e) => setSelectedAssigneeId(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
+            <option value="">Sin Asignar</option>
+            {teamMembers.map((member) => (
+              <option key={member.user_id} value={member.user_id}>{member.email}</option>
             ))}
           </select>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-          <button
-            type="submit"
-            className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Añadir Tarea
+          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value === '' ? '' : Number(e.target.value))} className="w-full border-gray-300 rounded-md shadow-sm">
+            <option value="">Sin Proyecto</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>{project.name}</option>
+            ))}
+          </select>
+          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm" />
+        </div>
+        <div className="flex justify-end space-x-3 pt-4 border-t">
+          {/* --- NUEVO: Botón 'Cancelar' --- */}
+          <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+            Cancelar
+          </button>
+          <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400">
+            {loading ? 'Añadiendo...' : 'Añadir Tarea'}
           </button>
         </div>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }
