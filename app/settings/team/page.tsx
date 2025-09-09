@@ -62,15 +62,24 @@ export default function TeamSettingsPage() {
     setIsInviting(false); // Desbloqueamos el botón
   };
 
-  const handleRemoveMember = (memberId: string) => {
-    if (confirm('¿Estás seguro de que quieres eliminar a este miembro?')) {
-        alert(`Próximamente: Eliminar miembro con ID: ${memberId}`);
+  const handleRemoveMember = async (memberId: string) => {
+    if (confirm('¿Estás seguro de que quieres eliminar a este miembro del equipo? Esta acción no se puede deshacer.')) {
+      // 1. Llamamos a la nueva función RPC que creamos
+      const { error } = await supabase.rpc('remove_team_member', {
+        member_id_to_remove: memberId
+      });
+  
+      if (error) {
+        console.error('Error al eliminar el miembro:', error);
+        alert(`Error al eliminar el miembro: ${error.message}`);
+      } else {
+        // 2. Si todo sale bien, actualizamos la lista de miembros en la pantalla
+        //    sin necesidad de recargar la página.
+        setMembers(members.filter(member => member.user_id !== memberId));
+        alert('Miembro eliminado con éxito.');
+      }
     }
   };
-
-  if (isLoading) {
-    return <div className="max-w-4xl mx-auto p-8 text-center">Cargando equipo...</div>;
-  }
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8">
