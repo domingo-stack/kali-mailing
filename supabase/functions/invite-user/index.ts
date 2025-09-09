@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       emailToInvite,
       {
-        redirectTo: 'http://localhost:3000/accept-invite',
+        redirectTo: 'gestor.califica.ai/accept-invite',
         data: { team_id: team_id }
       }
     )

@@ -22,6 +22,7 @@ export default function TeamSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isInviting, setIsInviting] = useState(false); // <-- Nuevo estado para el botón
   const [emailToInvite, setEmailToInvite] = useState('');
+  
 
   useEffect(() => {
     async function fetchMembers() {

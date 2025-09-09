@@ -18,6 +18,7 @@ import InviteProjectMembersModal from '@/components/InviteProjectMembersModal'
 import { User } from '@supabase/supabase-js'
 import { TaskUpdatePayload } from '@/lib/types';
 import { CollaboratorRecord } from '@/lib/types'; // O la ruta correcta a tu archivo
+import DeleteProjectModal from '@/components/DeleteProjectModal';
 
 type FilterType = 'alDia' | 'atrasadas' | 'finalizadas';
 
@@ -38,6 +39,7 @@ export default function MyTasksPage() {
   const [createModalContent, setCreateModalContent] = useState<'task' | 'project' | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [invitingToProject, setInvitingToProject] = useState<Project | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<ProjectWithMembers | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -97,6 +99,10 @@ export default function MyTasksPage() {
   }, [user, fetchData]);
 
   const closeCreateModal = () => setCreateModalContent(null);
+
+  const openDeleteModal = (project: ProjectWithMembers) => {
+    setProjectToDelete(project);
+  };
 
   const handleAddTask = async (taskData: { title: string; description: string; projectId: number | null; dueDate: string | null; assigneeId: string | null; }) => {
     if (!user) return;
@@ -261,7 +267,7 @@ export default function MyTasksPage() {
             {tasks.length > 0 ? tasks.map(task => (<TaskCard key={task.id} task={task} onUpdate={handleTaskCompleted} onDelete={handleDeleteTask} onSelect={handleSelectTask} />)) : (<p className="text-center text-gray-500 py-8">No hay tareas en esta categoría.</p>)}
           </div>
         )}
-        <MyProjects projects={projects} onInviteClick={(project) => setInvitingToProject(project)} />
+        <MyProjects  projects={projects}   onInviteClick={(project) => setInvitingToProject(project)}  onDeleteClick={openDeleteModal} />
         <ActivityFeed />
       </main>
       <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>
@@ -298,6 +304,21 @@ export default function MyTasksPage() {
           />
         )}
       </Modal>
+      <DeleteProjectModal
+        isOpen={!!projectToDelete}
+        onClose={() => setProjectToDelete(null)}
+        projectToDelete={projectToDelete}
+        allProjects={projects}
+        onProjectDeleted={() => {
+          fetchData(); // Reutilizamos tu función para refrescar todo
+          setProjectToDelete(null); // Cerramos el modal
+        }}
+      />
+
+      <CreateButton 
+        onNewTask={() => setCreateModalContent('task')} 
+        onNewProject={() => setCreateModalContent('project')} 
+      />
       <CreateButton 
         onNewTask={() => setCreateModalContent('task')} 
         onNewProject={() => setCreateModalContent('project')} 

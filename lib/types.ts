@@ -18,6 +18,7 @@ export type TeamMember = {
     id: number;
     name: string;
     description: string | null;
+    owner_id: string;
   };
   
   // Se elimina el tipo 'Subtask'

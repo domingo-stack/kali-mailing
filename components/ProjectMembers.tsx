@@ -31,7 +31,7 @@ export default function ProjectMembers({ members }: ProjectMembersProps) {
         )}
       </div>
       <button className="px-3 py-1.5 text-sm font-semibold text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200">
-        Invitar (Próximamente)
+        Invitar
       </button>
     </div>
   );

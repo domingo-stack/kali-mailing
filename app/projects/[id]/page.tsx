@@ -18,6 +18,8 @@ import InviteProjectMembersModal from '@/components/InviteProjectMembersModal'
 import TaskCard from '@/components/TaskCard'
 import { TaskUpdatePayload } from '@/lib/types';
 import { CollaboratorRecord } from '@/lib/types'; // O la ruta correcta
+import DeleteProjectModal from '@/components/DeleteProjectModal';
+import { TrashIcon } from '@/components/icons/TrashIcon';
 
 const KANBAN_COLUMNS = ['Por Hacer', 'En Progreso', 'Hecho'];
 
@@ -39,6 +41,7 @@ export default function ProjectDetailPage() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   // --- CORRECCIÓN: AÑADIMOS LA DEFINICIÓN DE 'SENSORS' ---
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -90,6 +93,10 @@ export default function ProjectDetailPage() {
     fetchData();
   }, [fetchData]);
 
+  const openDeleteModal = () => {
+    // Usamos el 'project' que ya tenemos en el estado de la página
+    setProjectToDelete(project); 
+  };
   const handleAddTask = async (taskData: { title: string; description: string; projectId: number | null; dueDate: string | null; assigneeId: string | null; }) => {
     if (!user) return;
     const { data: teamData } = await supabase.from('team_members').select('team_id').eq('user_id', user.id).single();
@@ -254,14 +261,27 @@ export default function ProjectDetailPage() {
             <div className="mb-8">
               <Link href="/" className="text-sm text-blue-600 hover:underline">&larr; Volver al Dashboard</Link>
               <div className="flex justify-between items-start mt-2">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
-                    <p className="text-gray-600 mt-1">{project.description}</p>
-                </div>
-                <div onClick={() => setIsInviteModalOpen(true)} className="cursor-pointer">
-                    <ProjectMembers members={projectMembers} />
-                </div>
-              </div>
+  <div>
+    <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
+    <p className="text-gray-600 mt-1">{project.description}</p>
+  </div>
+  {/* Contenedor para los botones de la derecha */}
+  <div className="flex items-center gap-4">
+    <div onClick={() => setIsInviteModalOpen(true)} className="cursor-pointer">
+      <ProjectMembers members={projectMembers} />
+    </div>
+    {/* El botón de borrar solo aparece si eres el dueño del proyecto */}
+    {user && project && user.id === project.owner_id && (
+      <button
+        onClick={openDeleteModal}
+        className="p-2 rounded-full text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+        title="Eliminar proyecto"
+      >
+        <TrashIcon className="w-5 h-5" />
+      </button>
+    )}
+  </div>
+</div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {KANBAN_COLUMNS.map(status => (
@@ -321,6 +341,16 @@ export default function ProjectDetailPage() {
           />
         </div>
       </DndContext>
+      <DeleteProjectModal
+    isOpen={!!projectToDelete}
+    onClose={() => setProjectToDelete(null)}
+    projectToDelete={projectToDelete}
+    allProjects={allProjects}
+    onProjectDeleted={() => {
+      setProjectToDelete(null); // Cerramos el modal
+      router.push('/'); // Te enviamos al dashboard porque el proyecto ya no existe
+    }}
+  />
     </AuthGuard>
   );
 }

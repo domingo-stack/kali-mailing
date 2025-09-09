@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Project } from '@/lib/types'
 import { ChevronRightIcon, UserPlusIcon } from '@heroicons/react/20/solid'
+import { TrashIcon } from '@/components/icons/TrashIcon';
 
 // El tipo de proyecto ahora incluye la lista de miembros
 type ProjectWithMembers = Project & { members: { user_id: string; email: string; }[] };
@@ -10,6 +11,7 @@ type ProjectWithMembers = Project & { members: { user_id: string; email: string;
 type MyProjectsProps = {
   projects: ProjectWithMembers[];
   onInviteClick: (project: ProjectWithMembers) => void;
+  onDeleteClick: (project: ProjectWithMembers) => void;
 };
 
 const Avatar = ({ email }: { email: string | undefined }) => {
@@ -24,7 +26,7 @@ const Avatar = ({ email }: { email: string | undefined }) => {
   );
 };
 
-export default function MyProjects({ projects, onInviteClick }: MyProjectsProps) {
+export default function MyProjects({ projects, onInviteClick, onDeleteClick }: MyProjectsProps) {
   const projectsPreview = projects.slice(0, 3);
 
   return (
@@ -66,6 +68,16 @@ export default function MyProjects({ projects, onInviteClick }: MyProjectsProps)
                 >
                   <UserPlusIcon className="h-4 w-4" />
                 </button>
+                <button
+                      onClick={(e) => {
+                        e.stopPropagation(); // Evita que se active el Link de navegación
+                        onDeleteClick(project);
+                      }}
+                      className="ml-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+                      title="Eliminar proyecto"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
               </div>
             </div>
           ))
