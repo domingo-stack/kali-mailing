@@ -16,6 +16,8 @@ import CreateButton from '@/components/CreateButton'
 import AddTaskForm from '@/components/AddTaskForm'
 import InviteProjectMembersModal from '@/components/InviteProjectMembersModal'
 import TaskCard from '@/components/TaskCard'
+import { TaskUpdatePayload } from '@/lib/types';
+import { CollaboratorRecord } from '@/lib/types'; // O la ruta correcta
 
 const KANBAN_COLUMNS = ['Por Hacer', 'En Progreso', 'Hecho'];
 
@@ -68,14 +70,14 @@ export default function ProjectDetailPage() {
 
     setTeamMembers(teamMembersData);
     const membersMap = new Map(teamMembersData.map((member: TeamMember) => [member.user_id, member.email]));
-    // --- CORRECCIÓN DE TIPOS EXPLÍCITA ---
-    const enrichedTasks: Task[] = (tasksData || []).map((task: any) => {
-        const assigneeEmail = task.assignee_user_id ? membersMap.get(task.assignee_user_id) : undefined;
-        return {
-          ...task,
-          assignee: assigneeEmail ? { email: assigneeEmail } : null
-        };
-    });
+    // --- CORRECCIÓN FINAL DE TIPOS ---
+    const enrichedTasks: Task[] = (tasksData || []).map((task: Task) => {
+      const assigneeEmail = task.assignee_user_id ? membersMap.get(task.assignee_user_id) : undefined;
+      return {
+        ...task,
+        assignee: typeof assigneeEmail === 'string' ? { email: assigneeEmail } : null
+      };
+  });
 
     setProject(projectData);
     setProjectMembers(membersData);
@@ -111,10 +113,10 @@ export default function ProjectDetailPage() {
     if (error) { console.error('Error soft-deleting task:', error); await fetchData(); }
   };
 
-  const handleUpdateTask = async (updatedData: any) => {
+  const handleUpdateTask = async (updatedData: TaskUpdatePayload) => {
     if (!editingTask) return;
     setIsSaving(true); 
-
+  
     const { error } = await supabase.rpc('update_task', {
       p_task_id: editingTask.id,
       p_new_title: updatedData.title,
@@ -123,12 +125,12 @@ export default function ProjectDetailPage() {
       p_new_project_id: updatedData.project_id,
       p_new_assignee_id: updatedData.assignee_user_id
     });
-
+  
     if (error) {
       console.error('Error updating task via RPC:', error);
       alert('Error al guardar los cambios.');
     }
-    
+  
     await fetchData(); 
     setIsSaving(false); 
   };
@@ -172,7 +174,7 @@ export default function ProjectDetailPage() {
       console.error('Error fetching collaborators:', collaboratorsRes.error);
     } else {
         const membersMap = new Map(teamMembers.map(m => [m.user_id, m.email]));
-        const fetchedCollaborators = collaboratorsRes.data.map((collab: any) => ({
+        const fetchedCollaborators = collaboratorsRes.data.map((collab: CollaboratorRecord) => ({
             user_id: collab.user_id,
             email: membersMap.get(collab.user_id) || 'Email no encontrado'
         }));

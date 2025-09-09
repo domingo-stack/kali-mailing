@@ -20,7 +20,6 @@ type TeamWithProjects = {
 
 export default function ProjectsPage() {
   const { user } = useAuth();
-  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

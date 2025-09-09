@@ -42,3 +42,14 @@ export type TeamMember = {
     assignee: { email: string; } | null;
     collaborators?: Collaborator[];
   };
+
+  export interface TaskUpdatePayload {
+    title?: string;
+    description?: string | null;
+    due_date?: string | null;
+    project_id?: number | null;
+    assignee_user_id?: string | null;
+  }
+
+  export interface CollaboratorRecord {
+    user_id: string;}

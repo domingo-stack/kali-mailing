@@ -7,6 +7,7 @@ import { Task, Comment, Project, TeamMember, Collaborator } from '@/lib/types'
 import { Listbox, Transition } from '@headlessui/react'
 import { CheckIcon, UserPlusIcon, XCircleIcon, CalendarDaysIcon, FolderIcon, UserCircleIcon } from '@heroicons/react/24/outline'
 import { User } from '@supabase/supabase-js'
+import { TaskUpdatePayload } from '@/lib/types';
 
 type EditTaskFormProps = {
   task: Task;
@@ -15,7 +16,7 @@ type EditTaskFormProps = {
   collaborators: Collaborator[];
   currentUser: User | null;
   isSaving: boolean; // <-- NUEVA PROP
-  onSave: (updatedData: any) => Promise<void>;
+  onSave: (updatedData: TaskUpdatePayload) => Promise<void>;
   onCancel: () => void;
   onCommentAdd: (content: string) => Promise<void>;
   onToggleComplete: (task: Task) => void;
@@ -48,7 +49,6 @@ export default function EditTaskForm({
   onCommentAdd,
   onToggleComplete,
   onCollaboratorAdd,
-  onCollaboratorRemove
 }: EditTaskFormProps) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || '');
@@ -80,7 +80,7 @@ export default function EditTaskForm({
         clearTimeout(handler);
       };
     }
-  }, [title, description, dueDate, selectedProjectId, selectedAssigneeId]);
+  }, [title, description, dueDate, selectedProjectId, selectedAssigneeId, onSave]);
 
   const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;

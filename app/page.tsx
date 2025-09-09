@@ -16,7 +16,8 @@ import MyProjects from '@/components/MyProjects'
 import ActivityFeed from '@/components/ActivityFeed'
 import InviteProjectMembersModal from '@/components/InviteProjectMembersModal'
 import { User } from '@supabase/supabase-js'
-import { TaskUpdatePayload } from '@/types/types'; // O la ruta correcta a tu archivo
+import { TaskUpdatePayload } from '@/lib/types';
+import { CollaboratorRecord } from '@/lib/types'; // O la ruta correcta a tu archivo
 
 type FilterType = 'alDia' | 'atrasadas' | 'finalizadas';
 
@@ -170,18 +171,18 @@ export default function MyTasksPage() {
         .eq('task_id', task.id)
         .order('created_at')
     ]);
-
+  
     if (collaboratorsRes.error) {
       console.error('Error fetching collaborators:', collaboratorsRes.error);
     } else {
       const membersMap = new Map(teamMembers.map(m => [m.user_id, m.email]));
-      const fetchedCollaborators = collaboratorsRes.data.map((collab: any) => ({
+      const fetchedCollaborators = collaboratorsRes.data.map((collab: CollaboratorRecord) => ({
         user_id: collab.user_id,
         email: membersMap.get(collab.user_id) || 'Email no encontrado'
       }));
       setCollaborators(fetchedCollaborators);
     }
-
+  
     if (commentsRes.error) console.error('Error fetching comments:', commentsRes.error);
     else setComments(commentsRes.data as Comment[]);
     setEditingTask(task);
