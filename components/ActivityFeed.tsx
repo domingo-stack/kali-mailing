@@ -54,7 +54,7 @@ export default function ActivityFeed() {
   const formatMessage = (activity: ActivityEvent) => {
     // ... (sin cambios)
     const user = <span className="font-semibold">{activity.user_email}</span>;
-    const title = <span className="font-semibold text-blue-600">"{activity.event_title}"</span>;
+    const title = <span className="font-semibold text-blue-600">{'"'}{activity.event_title}{'"'}</span>;
     switch (activity.event_type) {
       case 'tarea_completada': return <>{user} completó la tarea {title}</>;
       case 'comentario_nuevo': return <>{user} comentó en una tarea: {title}</>;

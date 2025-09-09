@@ -1,10 +1,11 @@
 'use client'
 
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, Editor } from '@tiptap/react' // <-- 1. IMPORTAMOS EL TIPO 'Editor'
 import StarterKit from '@tiptap/starter-kit'
 import { useEffect } from 'react'
 
-const Toolbar = ({ editor }: { editor: any }) => {
+// --- 2. USAMOS EL TIPO CORRECTO AQUÍ ---
+const Toolbar = ({ editor }: { editor: Editor | null }) => {
   if (!editor) {
     return null
   }
@@ -35,8 +36,7 @@ const RichTextEditor = ({ content, onChange, disabled }: { content: string, onCh
     extensions: [StarterKit],
     content: content,
     editable: !disabled,
-    // --- LA CORRECCIÓN ESTÁ AQUÍ ---
-    immediatelyRender: false, // Evita el error de hidratación en Next.js
+    immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.isEmpty ? '' : editor.getHTML())
     },

@@ -16,6 +16,7 @@ import MyProjects from '@/components/MyProjects'
 import ActivityFeed from '@/components/ActivityFeed'
 import InviteProjectMembersModal from '@/components/InviteProjectMembersModal'
 import { User } from '@supabase/supabase-js'
+import { TaskUpdatePayload } from '@/types/types'; // O la ruta correcta a tu archivo
 
 type FilterType = 'alDia' | 'atrasadas' | 'finalizadas';
 
@@ -71,15 +72,19 @@ export default function MyTasksPage() {
       tasksToDisplay = tasksToDisplay.filter(task => task.completed);
     }
     
-    const membersMap = new Map((membersData || []).map((member: TeamMember) => [member.user_id, member.email]));
-    const enrichedTasks: Task[] = tasksToDisplay.map((task: any) => {
+    const membersMap = new Map(
+      (membersData || [])
+        .filter((member: TeamMember) => member.user_id && member.email)
+        .map((member: TeamMember) => [member.user_id!, member.email!])
+        
+    );
+    const enrichedTasks: Task[] = tasksToDisplay.map((task: Task) => {
       const assigneeEmail = task.assignee_user_id ? membersMap.get(task.assignee_user_id) : undefined;
       return {
         ...task,
-        assignee: assigneeEmail ? { email: assigneeEmail } : null,
+        assignee: typeof assigneeEmail === 'string' ? { email: assigneeEmail } : null,
       };
     });
-
     setTasks(enrichedTasks);
     setLoading(false);
   }, [user, activeFilter]);
@@ -131,19 +136,19 @@ export default function MyTasksPage() {
     if (error) { console.error('Error soft-deleting task:', error); await fetchData(); }
   };
 
-  const handleUpdateTask = async (updatedData: any) => {
+  const handleUpdateTask = async (updatedData: TaskUpdatePayload) => {
     if (!editingTask) return;
     setIsSaving(true); 
-
+  
     const { error } = await supabase.rpc('update_task', {
       p_task_id: editingTask.id,
       p_new_title: updatedData.title,
       p_new_description: updatedData.description,
       p_new_due_date: updatedData.due_date,
-      p_new_project_id: updatedData.project_id,
+      p_new_project_id: updatedData.project_id, // Ahora esto es válido
       p_new_assignee_id: updatedData.assignee_user_id
     });
-
+  
     if (error) {
       console.error('Error updating task via RPC:', error);
       alert('Error al guardar los cambios.');
