@@ -1,19 +1,26 @@
+// context/AuthContext.tsx
 'use client'
 
 import { createContext, useContext, useEffect, useState, useMemo } from 'react'
-import { supabase } from '../lib/supabaseClient'
+// 1. IMPORTAMOS createClient y SupabaseClient AQUÍ
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type { Session, User } from '@supabase/supabase-js'
 
-// El contexto solo se preocupará por la sesión y el estado de carga inicial.
-const AuthContext = createContext<{ 
+// 2. AÑADIMOS EL CLIENTE DE SUPABASE AL TIPO DEL CONTEXTO
+type AuthContextType = { 
   session: Session | null; 
   user: User | null; 
   isLoading: boolean;
-}>({
-  session: null,
-  user: null,
-  isLoading: true,
-});
+  supabase: SupabaseClient; // El cliente siempre estará disponible
+};
+
+// Creamos el cliente de Supabase una sola vez fuera del componente
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -21,7 +28,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Verificamos la sesión inicial UNA SOLA VEZ.
     const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
@@ -30,8 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     checkInitialSession();
 
-    // Escuchamos cambios (login/logout) y solo actualizamos la sesión.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Cuando la sesión cambia, el cliente de Supabase se actualiza automáticamente.
       setSession(session);
       setUser(session?.user ?? null);
     });
@@ -45,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     user,
     isLoading,
+    supabase, // 3. PROVEEMOS EL CLIENTE A TRAVÉS DEL CONTEXTO
   }), [session, user, isLoading]);
 
   return (
@@ -55,5 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }

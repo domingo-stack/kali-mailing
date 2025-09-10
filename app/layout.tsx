@@ -1,29 +1,31 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { AuthProvider } from "../context/AuthContext";
-import Navbar from "../components/Navbar"; // Debe estar importado
+// app/layout.tsx
 
-const inter = Inter({ subsets: ["latin"] });
+import './globals.css'
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import { AuthProvider } from '@/context/AuthContext' // <-- 1. IMPORTA EL PROVIDER
+import Navbar from '@/components/Navbar' // Asumiendo que el Navbar está aquí
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: "Gestor de Tareas",
-  description: "Creado con Gemini y Domingo",
-};
+  title: 'Gestor de Tareas',
+  description: 'Una aplicación para gestionar tus proyectos y tareas.',
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="es">
       <body className={inter.className}>
-        <AuthProvider>
-          <Navbar /> {/* Debe estar aquí */}
-          <main>{children}</main>
+        <AuthProvider> {/* <-- 2. ENVUELVE TODO CON EL PROVIDER */}
+          <Navbar />
+          {children}
         </AuthProvider>
       </body>
     </html>
-  );
+  )
 }

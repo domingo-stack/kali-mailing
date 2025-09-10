@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
 import { Task, Comment, Project, TeamMember, Collaborator } from '@/lib/types'
 import AddTaskForm from '@/components/AddTaskForm'
 import Modal from '@/components/Modal'
@@ -15,7 +14,6 @@ import AddProjectForm from '@/components/AddProjectForm'
 import MyProjects from '@/components/MyProjects'
 import ActivityFeed from '@/components/ActivityFeed'
 import InviteProjectMembersModal from '@/components/InviteProjectMembersModal'
-import { User } from '@supabase/supabase-js'
 import { TaskUpdatePayload } from '@/lib/types';
 import { CollaboratorRecord } from '@/lib/types'; // O la ruta correcta a tu archivo
 import DeleteProjectModal from '@/components/DeleteProjectModal';
@@ -26,7 +24,7 @@ type FilterType = 'alDia' | 'atrasadas' | 'finalizadas';
 type ProjectWithMembers = Project & { members: { user_id: string; email: string; }[] };
 
 export default function MyTasksPage() {
-  const { user } = useAuth();
+  const { user, supabase } = useAuth();
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<ProjectWithMembers[]>([]); // Usamos el nuevo tipo
@@ -106,26 +104,54 @@ export default function MyTasksPage() {
 
   const handleAddTask = async (taskData: { title: string; description: string; projectId: number | null; dueDate: string | null; assigneeId: string | null; }) => {
     if (!user) return;
-    const { data: teamData } = await supabase.from('team_members').select('team_id').eq('user_id', user.id).single();
-    if (!teamData) { console.error('No se pudo encontrar el equipo para crear la tarea'); return; }
-    const { error } = await supabase.rpc('create_task', { p_title: taskData.title, p_description: taskData.description, p_project_id: taskData.projectId, p_due_date: taskData.dueDate, p_assignee_id: taskData.assigneeId, p_team_id: teamData.team_id });
-    if (error) { alert('Error al crear la tarea: ' + error.message); } 
-    else { await fetchData(); closeCreateModal(); }
+  
+    // Obtenemos el equipo activo desde el perfil
+    const { data: profileData } = await supabase.from('profiles').select('active_team_id').eq('id', user.id).single();
+    if (!profileData || !profileData.active_team_id) { 
+      console.error('No se pudo encontrar el equipo activo para crear la tarea'); 
+      alert('Error: No tienes un equipo activo seleccionado.');
+      return; 
+    }
+  
+    const { error } = await supabase.rpc('create_task', { 
+      p_title: taskData.title, 
+      p_description: taskData.description, 
+      p_project_id: taskData.projectId, 
+      p_due_date: taskData.dueDate, 
+      p_assignee_id: taskData.assigneeId, 
+      p_team_id: profileData.active_team_id // Usamos el ID del equipo activo
+    });
+  
+    if (error) { 
+      alert('Error al crear la tarea: ' + error.message); 
+    } else { 
+      await fetchData(); 
+      closeCreateModal(); 
+    }
   };
-
+  
   const handleAddProject = async (projectData: { name: string; description: string | null }) => {
     if (!user) return;
-    const { data: teamData } = await supabase.from('team_members').select('team_id').eq('user_id', user.id).single();
-    if (teamData) {
-        const { error } = await supabase.rpc('create_project', { 
-            p_name: projectData.name, 
-            p_description: projectData.description, 
-            p_team_id: teamData.team_id 
-        });
-        if (error) { alert('Error al crear el proyecto: ' + error.message); } 
-        else { await fetchData(); closeCreateModal(); }
-    } else {
-        alert('No se pudo encontrar el equipo del usuario.');
+  
+    // Obtenemos el equipo activo desde el perfil
+    const { data: profileData } = await supabase.from('profiles').select('active_team_id').eq('id', user.id).single();
+    if (!profileData || !profileData.active_team_id) { 
+      console.error('No se pudo encontrar el equipo activo para crear el proyecto'); 
+      alert('Error: No tienes un equipo activo seleccionado.');
+      return; 
+    }
+  
+    const { error } = await supabase.rpc('create_project', { 
+      p_name: projectData.name, 
+      p_description: projectData.description, 
+      p_team_id: profileData.active_team_id // Usamos el ID del equipo activo
+    });
+  
+    if (error) { 
+      alert('Error al crear el proyecto: ' + error.message); 
+    } else { 
+      await fetchData(); 
+      closeCreateModal(); 
     }
   };
 

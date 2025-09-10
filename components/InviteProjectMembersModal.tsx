@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
 
 type TeamMember = {
   user_id: string;
@@ -19,7 +19,8 @@ export default function InviteProjectMembersModal({ projectId, onClose, onMember
   const [availableMembers, setAvailableMembers] = useState<TeamMember[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const { supabase } = useAuth();
+  
   useEffect(() => {
     async function fetchAvailableMembers() {
       setLoading(true);

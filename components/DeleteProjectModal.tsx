@@ -2,9 +2,9 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
 import { Project } from '@/lib/types';
-import { TrashIcon } from './icons/TrashIcon';
+import { TrashIcon } from '@/components/icons/TrashIcon';
 
 type DeleteProjectModalProps = {
   isOpen: boolean;
@@ -31,6 +31,8 @@ export default function DeleteProjectModal({
   // Estado para el botón de confirmación
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { supabase } = useAuth();
+
 
   // Reiniciar el estado del modal cada vez que se abre
   useEffect(() => {

@@ -16,11 +16,15 @@ export type TeamMember = {
   
   export type Project = {
     id: number;
+    created_at: string;
     name: string;
     description: string | null;
+    end_date: string | null;
+    team_id: number;
     owner_id: string;
+    google_drive_url?: string | null;
   };
-  
+
   // Se elimina el tipo 'Subtask'
   export type Comment = {
     id: number;
@@ -54,3 +58,11 @@ export type TeamMember = {
 
   export interface CollaboratorRecord {
     user_id: string;}
+
+
+export type Team = {
+  id: number;
+  created_at: string;
+  name: string;
+  owner_id: string;
+};

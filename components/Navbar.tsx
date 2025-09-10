@@ -2,51 +2,35 @@
 
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
-import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import Notifications from '@/components/Notifications'
 import { useState, useEffect } from 'react'
 
 export default function Navbar() {
-  const { user } = useAuth()
+  const { user, supabase } = useAuth()
   const [role, setRole] = useState<string | null>(null);
   const router = useRouter()
+  const [teamName, setTeamName] = useState<string | null>(null);
 
-  // --- LÓGICA PARA OBTENER EL ROL (REESCRITA Y A PRUEBA DE ERRORES) ---
-  useEffect(() => {
-    if (user) {
-      const getUserRole = async () => {
-        // Paso 1: Obtener el ID del equipo del usuario actual.
-        const { data: memberData } = await supabase
-          .from('team_members')
-          .select('team_id')
-          .eq('user_id', user.id)
-          .single();
 
-        if (!memberData) {
-          setRole(null); // El usuario no pertenece a ningún equipo
-          return;
-        }
+useEffect(() => {
+  if (user && supabase) {
+    const getNavbarData = async () => {
+      const { data, error } = await supabase.rpc('get_user_role_and_team_info');
 
-        // Paso 2: Con el ID del equipo, obtener el ID del dueño de ese equipo.
-        const { data: teamData } = await supabase
-          .from('teams')
-          .select('owner_id')
-          .eq('id', memberData.team_id)
-          .single();
-
-        // Paso 3: Comparar si el usuario actual es el dueño del equipo.
-        if (teamData && teamData.owner_id === user.id) {
-          setRole('Dueño');
-        } else {
-          setRole('Miembro');
-        }
-      };
-      getUserRole();
-    } else {
-      setRole(null); // Limpia el rol si no hay usuario
-    }
-  }, [user]); // Se ejecuta cada vez que el usuario cambia
+      if (error) {
+        console.error("Error fetching navbar data:", error);
+      } else if (data && data.length > 0) {
+        setRole(data[0].role);
+        setTeamName(data[0].team_name);
+      }
+    };
+    getNavbarData();
+  } else {
+    setRole(null);
+    setTeamName(null);
+  }
+}, [user, supabase]); // Se ejecuta cada vez que el usuario cambia
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Fragment, useRef } from 'react'
 import RichTextEditor from '@/components/RichTextEditor' 
-import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/context/AuthContext';
 import { Task, Comment, Project, TeamMember, Collaborator } from '@/lib/types'
 import { Listbox, Transition } from '@headlessui/react'
 import { CheckIcon, UserPlusIcon, XCircleIcon, CalendarDaysIcon, FolderIcon, UserCircleIcon } from '@heroicons/react/24/outline'
@@ -57,7 +57,7 @@ export default function EditTaskForm({
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | ''>(task.assignee_user_id || '');
   const [newComment, setNewComment] = useState('');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  
+  const { supabase } = useAuth();
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionQuery, setSuggestionQuery] = useState('');
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);

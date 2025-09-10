@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/AuthContext'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -35,7 +35,8 @@ export default function ActivityFeed() {
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-
+  const { supabase } = useAuth();
+  
   useEffect(() => {
     async function fetchActivity() {
       setLoading(true);

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from './RichTextEditor'
 
 type TeamMember = { user_id: string; email: string; role: string; };
@@ -27,6 +27,7 @@ export default function AddTaskForm({ onAddTask, projects, onCancel }: AddTaskFo
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | ''>('');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(false); // Estado de carga
+  const { supabase } = useAuth();
 
   useEffect(() => {
     async function fetchTeamMembers() {

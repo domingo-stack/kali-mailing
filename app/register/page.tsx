@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../../lib/supabaseClient'
+import { useAuth } from '@/context/AuthContext'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
+  const { supabase } = useAuth();
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)

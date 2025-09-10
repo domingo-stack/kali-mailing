@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
 import { BellIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
@@ -15,7 +14,7 @@ type Notification = {
 };
 
 export default function Notifications() {
-  const { user } = useAuth();
+  const { user, supabase   } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -58,7 +57,7 @@ export default function Notifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, supabase]);
 
   const handleNotificationClick = async (notification: Notification) => {
     // Marcar como leída solo si no lo está ya
