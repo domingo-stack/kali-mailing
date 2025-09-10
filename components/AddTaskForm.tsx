@@ -36,7 +36,7 @@ export default function AddTaskForm({ onAddTask, projects, onCancel }: AddTaskFo
       else if (data) setTeamMembers(data);
     }
     fetchTeamMembers();
-  }, []);
+  }, [supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

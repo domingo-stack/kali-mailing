@@ -130,7 +130,7 @@ export default function ProjectDetailPage() {
 
   // En app/projects/[id]/page.tsx
 
-  const handleAddTask = async (taskData: { title: string; description: string; dueDate: string | null; assigneeId: string | null; }) => {
+  const handleAddTask = async (taskData: { title: string; description: string; dueDate: string | null; assigneeId: string | null; projectId: number | null; }) => {
     // 1. Verificamos que tenemos todo lo necesario.
     if (!user || !supabase || !project) {
       alert("Error: No se puede crear la tarea porque falta información del proyecto o del usuario.");
