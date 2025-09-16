@@ -457,10 +457,25 @@ export default function ProjectDetailPage() {
         <div className="bg-gray-50 min-h-screen font-sans">
           <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
             <div className="mb-8">
-              <Link href="/" className="text-sm text-blue-600 hover:underline">&larr; Volver al Dashboard</Link>
+              {/* 👇 CAMBIO 1: Enlace "Volver" */}
+              <Link 
+                href="/" 
+                className="text-sm"
+                style={{ color: '#ff8080' }}
+                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+              >
+                &larr; Volver al Dashboard
+              </Link>
               <div className="flex justify-between items-start mt-2">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
+                  {/* 👇 CAMBIO 2: Título del Proyecto */}
+                  <h1 
+                    className="text-3xl font-bold" 
+                    style={{ color: '#383838' }}
+                  >
+                    {project.name}
+                  </h1>
                   <p className="text-gray-600 mt-1">{project.description}</p>
                 </div>
                 <div className="flex items-center gap-2"> 
@@ -488,7 +503,14 @@ export default function ProjectDetailPage() {
                     <ProjectMembers members={projectMembers} />
                   </div>
                   {user && project.owner_id === user.id && (
-                    <button onClick={() => setProjectToDelete(project)} className="p-2 rounded-full text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors" title="Eliminar proyecto">
+                    // 👇 CAMBIO 3: Botón "Eliminar"
+                    <button 
+                      onClick={() => setProjectToDelete(project)} 
+                      className="p-2 rounded-full text-gray-500 transition-colors" 
+                      title="Eliminar proyecto"
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF0F0'; e.currentTarget.style.color = '#ff8080'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6B7280'; }}
+                    >
                       <TrashIcon className="w-5 h-5" />
                     </button>
                   )}
@@ -506,7 +528,6 @@ export default function ProjectDetailPage() {
                   onUpdate={handleTaskCompleted}
                   onDelete={handleDeleteTask}
                   onSelect={handleSelectTask}
-                  // ondate, onDelete, onSelect deben apuntar a tus funciones handle...
                 />
               ))}
             </div>
@@ -520,7 +541,7 @@ export default function ProjectDetailPage() {
               onCancel={() => setIsCreateTaskModalOpen(false)}
             />
           </Modal>
-
+  
           <DeleteProjectModal
             isOpen={!!projectToDelete}
             onClose={() => setProjectToDelete(null)}
@@ -560,18 +581,15 @@ export default function ProjectDetailPage() {
               }}
             />
           </Modal>
-
+  
           <DragOverlay>
             {activeTask ? <TaskCard task={activeTask} onUpdate={()=>{}} onDelete={()=>{}} onSelect={()=>{}} /> : null}
           </DragOverlay>
-
+  
           <CreateButton
-
-            onNewTask={() => setIsCreateTaskModalOpen(true)}
-
-            onNewProject={() => router.push('/projects')} 
-
-          />
+            onNewTask={() => setIsCreateTaskModalOpen(true)}
+            onNewProject={() => router.push('/projects')} 
+          />
       
         </div>
       </DndContext>

@@ -87,16 +87,29 @@ export default function Notifications() {
       <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 rounded-full hover:bg-gray-100">
         <BellIcon className="h-6 w-6 text-gray-600" />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 block h-3 w-3 rounded-full bg-red-500 border-2 border-white" />
+          // 👇 CAMBIO 1: Punto de notificación usa el color primario (naranja)
+          <span 
+            className="absolute top-1 right-1 block h-3 w-3 rounded-full border-2 border-white"
+            style={{ backgroundColor: '#ff8080' }}
+          />
         )}
       </button>
-
+  
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-xl border z-20">
           <div className="p-4 flex justify-between items-center border-b">
-            <h3 className="font-semibold">Notificaciones</h3>
+            <h3 className="font-semibold" style={{ color: '#383838' }}>Notificaciones</h3>
             {unreadCount > 0 && 
-                <button onClick={markAllAsRead} className="text-sm text-blue-600 hover:underline">Marcar todas como leídas</button>
+              // 👇 CAMBIO 2: Enlace usa el color primario (naranja)
+              <button 
+                onClick={markAllAsRead} 
+                className="text-sm"
+                style={{ color: '#ff8080' }}
+                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+              >
+                Marcar todas como leídas
+              </button>
             }
           </div>
           <div className="max-h-96 overflow-y-auto">
@@ -108,9 +121,12 @@ export default function Notifications() {
                   key={notification.id}
                   href={notification.link_url || '#'} 
                   onClick={() => handleNotificationClick(notification)}
-                  className={`block p-4 border-b last:border-b-0 hover:bg-gray-50 ${!notification.is_read ? 'bg-blue-50' : ''}`}
+                  // 👇 CAMBIO 3: Fondo para no leídas usa un tono del color primario
+                  className={`block p-4 border-b last:border-b-0 hover:bg-gray-50`}
+                  style={!notification.is_read ? { backgroundColor: '#FFF0F0' } : {}}
                 >
-                  <p className="text-sm text-gray-700">{notification.message}</p>
+                  {/* 👇 CAMBIO 4: Texto principal usa el color de la marca */}
+                  <p className="text-sm" style={{ color: '#383838' }}>{notification.message}</p>
                   <p className="text-xs text-gray-400 mt-1">{new Date(notification.created_at).toLocaleString()}</p>
                 </Link>
               ))

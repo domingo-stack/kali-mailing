@@ -51,10 +51,13 @@ export default function CreateButton({ onNewTask, onNewProject }: CreateButtonPr
           </div>
         )}
 
-        <button
+<button
           onClick={() => setIsOpen(!isOpen)}
-          className={`w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition-transform transform ${isOpen ? 'rotate-45' : 'rotate-0'}`}
+          // 👇 HE QUITADO LAS CLASES 'bg-blue-600' y 'hover:bg-blue-700'
+          className={`w-14 h-14 rounded-full text-white flex items-center justify-center shadow-lg transition-transform transform ${isOpen ? 'rotate-45' : 'rotate-0'}`}
           aria-label="Crear nueva tarea o proyecto"
+          // 👇 Y HE AÑADIDO EL COLOR NARANJA DIRECTAMENTE AQUÍ
+          style={{ backgroundColor: '#ff8080' }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

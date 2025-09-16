@@ -52,8 +52,10 @@ export default function Dropdown<T extends string>({
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         type="button"
-        className="inline-flex justify-between items-center w-full sm:w-auto gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+        // 👇 CAMBIO 1: Quitamos text-gray-700 y lo añadimos en el style
+        className="inline-flex justify-between items-center w-full sm:w-auto gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-medium shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
         onClick={() => setIsOpen(!isOpen)}
+        style={{ color: '#383838' }}
       >
         {selectedOptionLabel}
         <ChevronDownIcon className="-mr-1 h-5 w-5 text-gray-400" />
@@ -68,9 +70,14 @@ export default function Dropdown<T extends string>({
               <button
                 key={option.value}
                 onClick={() => handleOptionClick(option.value)}
-                className={`block w-full text-left px-4 py-2 text-sm ${
-                  selectedValue === option.value ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                }`}
+                // 👇 CAMBIO 2: Quitamos las clases de color condicionales de aquí
+                className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100`}
+                // 👇 Y las aplicamos directamente con style para usar los colores de la marca
+                style={
+                  selectedValue === option.value 
+                  ? { backgroundColor: '#FFF0F0', color: '#ff8080', fontWeight: '500' } // Estilo para la opción seleccionada
+                  : { color: '#383838' } // Estilo para las demás opciones
+                }
               >
                 {option.label}
               </button>

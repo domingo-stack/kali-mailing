@@ -280,75 +280,112 @@ export default function MyTasksPage() {
   return (
     <AuthGuard>
       <main className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Mi Dashboard</h1>
+        {/* 👇 CAMBIO 1: Título usa el color de texto de la marca */}
+        <h1 
+          className="text-3xl font-bold mb-8" 
+          style={{ color: '#383838' }}
+        >
+          Mi Dashboard
+        </h1>
+  
         <div className="my-6 border-b border-gray-200">
           <div className="flex space-x-2">
-            <button onClick={() => setActiveFilter('alDia')} className={`px-4 py-2 text-sm font-medium rounded-t-md ${activeFilter === 'alDia' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>Al día</button>
-            <button onClick={() => setActiveFilter('atrasadas')} className={`px-4 py-2 text-sm font-medium rounded-t-md ${activeFilter === 'atrasadas' ? 'border-b-2 border-red-600 text-red-600' : 'text-gray-500 hover:text-gray-700'}`}>Atrasadas</button>
-            <button onClick={() => setActiveFilter('finalizadas')} className={`px-4 py-2 text-sm font-medium rounded-t-md ${activeFilter === 'finalizadas' ? 'border-b-2 border-green-600 text-green-600' : 'text-gray-500 hover:text-gray-700'}`}>Finalizadas</button>
+            {/* 👇 CAMBIO 2: Botones de filtro usan los colores de la marca */}
+            <button 
+              onClick={() => setActiveFilter('alDia')} 
+              className={`px-4 py-2 text-sm font-medium rounded-t-md`}
+              style={
+                activeFilter === 'alDia' 
+                  ? { borderBottom: '2px solid #ff8080', color: '#ff8080' } // Color Primario
+                  : { color: '#6B7280' } // Gris para inactivo
+              }
+            >
+              Al día
+            </button>
+            <button 
+              onClick={() => setActiveFilter('atrasadas')} 
+              className={`px-4 py-2 text-sm font-medium rounded-t-md`}
+              style={
+                activeFilter === 'atrasadas' 
+                  ? { borderBottom: '2px solid #ff8080', color: '#ff8080' } // Color Primario para atención
+                  : { color: '#6B7280' }
+              }
+            >
+              Atrasadas
+            </button>
+            <button 
+              onClick={() => setActiveFilter('finalizadas')} 
+              className={`px-4 py-2 text-sm font-medium rounded-t-md`}
+              style={
+                activeFilter === 'finalizadas' 
+                  ? { borderBottom: '2px solid #3c527a', color: '#3c527a' } // Color Secundario
+                  : { color: '#6B7280' }
+              }
+            >
+              Finalizadas
+            </button>
           </div>
         </div>
+        
         {loading ? <p>Cargando datos del dashboard...</p> : (
           <div className="space-y-3">
             {tasks.length > 0 ? tasks.map(task => (<TaskCard key={task.id} task={task} onUpdate={handleTaskCompleted} onDelete={handleDeleteTask} onSelect={handleSelectTask} />)) : (<p className="text-center text-gray-500 py-8">No hay tareas en esta categoría.</p>)}
           </div>
         )}
-        <MyProjects  projects={projects}   onInviteClick={(project) => setInvitingToProject(project)}  onDeleteClick={openDeleteModal} />
+        
+        <MyProjects projects={projects} onInviteClick={(project) => setInvitingToProject(project)} onDeleteClick={openDeleteModal} />
         <ActivityFeed />
       </main>
+      
+      {/* ... (el resto de tu código de Modales y CreateButton se queda igual) ... */}
       <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>
-        {editingTask && (
-          <EditTaskForm 
-            task={editingTask} 
-            projects={projects} 
-            comments={comments} 
-            collaborators={collaborators}
-            currentUser={user}
-            isSaving={isSaving}
-            onSave={handleUpdateTask} 
-            onCancel={() => setEditingTask(null)} 
-            onCommentAdd={handleCommentAdd} 
-            onToggleComplete={handleTaskCompleted} 
-            onCollaboratorAdd={handleCollaboratorAdd}
-            onCollaboratorRemove={handleCollaboratorRemove}
-          />
-        )}
-      </Modal>
-      <Modal isOpen={!!createModalContent} onClose={closeCreateModal}>
-        {createModalContent === 'task' && (<AddTaskForm onAddTask={handleAddTask} projects={projects} onCancel={closeCreateModal} />)}
-        {createModalContent === 'project' && (<AddProjectForm onAddProject={handleAddProject} onCancel={closeCreateModal} />)}
-      </Modal>
-      <Modal isOpen={!!invitingToProject} onClose={() => setInvitingToProject(null)}>
-        {invitingToProject && (
-          <InviteProjectMembersModal
-            projectId={invitingToProject.id}
-            onClose={() => setInvitingToProject(null)}
-            onMembersAdded={() => {
-              fetchData();
-              setInvitingToProject(null);
-            }}
-          />
-        )}
-      </Modal>
-      <DeleteProjectModal
-        isOpen={!!projectToDelete}
-        onClose={() => setProjectToDelete(null)}
-        projectToDelete={projectToDelete}
-        allProjects={projects}
-        onProjectDeleted={() => {
-          fetchData(); // Reutilizamos tu función para refrescar todo
-          setProjectToDelete(null); // Cerramos el modal
-        }}
-      />
-
-      <CreateButton 
-        onNewTask={() => setCreateModalContent('task')} 
-        onNewProject={() => setCreateModalContent('project')} 
-      />
-      <CreateButton 
-        onNewTask={() => setCreateModalContent('task')} 
-        onNewProject={() => setCreateModalContent('project')} 
-      />
+          {editingTask && (
+            <EditTaskForm 
+              task={editingTask} 
+              projects={projects} 
+              comments={comments} 
+              collaborators={collaborators}
+              currentUser={user}
+              isSaving={isSaving}
+              onSave={handleUpdateTask} 
+              onCancel={() => setEditingTask(null)} 
+              onCommentAdd={handleCommentAdd} 
+              onToggleComplete={handleTaskCompleted} 
+              onCollaboratorAdd={handleCollaboratorAdd}
+              onCollaboratorRemove={handleCollaboratorRemove}
+            />
+          )}
+        </Modal>
+        <Modal isOpen={!!createModalContent} onClose={closeCreateModal}>
+          {createModalContent === 'task' && (<AddTaskForm onAddTask={handleAddTask} projects={projects} onCancel={closeCreateModal} />)}
+          {createModalContent === 'project' && (<AddProjectForm onAddProject={handleAddProject} onCancel={closeCreateModal} />)}
+        </Modal>
+        <Modal isOpen={!!invitingToProject} onClose={() => setInvitingToProject(null)}>
+          {invitingToProject && (
+            <InviteProjectMembersModal
+              projectId={invitingToProject.id}
+              onClose={() => setInvitingToProject(null)}
+              onMembersAdded={() => {
+                fetchData();
+                setInvitingToProject(null);
+              }}
+            />
+          )}
+        </Modal>
+        <DeleteProjectModal
+          isOpen={!!projectToDelete}
+          onClose={() => setProjectToDelete(null)}
+          projectToDelete={projectToDelete}
+          allProjects={projects}
+          onProjectDeleted={() => {
+            fetchData(); 
+            setProjectToDelete(null);
+          }}
+        />
+  
+        <CreateButton 
+          onNewTask={() => setCreateModalContent('task')} 
+          onNewProject={() => setCreateModalContent('project')} 
+        />
     </AuthGuard>
   );
-}

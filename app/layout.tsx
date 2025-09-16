@@ -2,11 +2,14 @@
 
 import './globals.css'
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Nunito } from 'next/font/google'
 import { AuthProvider } from '@/context/AuthContext' // <-- 1. IMPORTA EL PROVIDER
 import Navbar from '@/components/Navbar' // Asumiendo que el Navbar está aquí
 
-const inter = Inter({ subsets: ['latin'] })
+const nunito = Nunito({
+  subsets: ['latin'],
+  weight: ['400', '700'] // 400 para normal, 700 para negrita
+})
 
 export const metadata: Metadata = {
   title: 'Gestor de Tareas',
@@ -20,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={inter.className}>
+      <body className={nunito.className}>
         <AuthProvider> {/* <-- 2. ENVUELVE TODO CON EL PROVIDER */}
           <Navbar />
           {children}

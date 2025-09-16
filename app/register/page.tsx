@@ -31,20 +31,31 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    // 👇 CAMBIO 1: Fondo de la página
+    <div 
+      className="min-h-screen flex items-center justify-center" 
+      style={{ backgroundColor: '#F8F8F8' }}
+    >
       <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-6">
+        {/* 👇 CAMBIO 2: Título */}
+        <h2 
+          className="text-2xl font-bold text-center mb-6"
+          style={{ color: '#383838' }}
+        >
           Crear una Cuenta
         </h2>
         
         {message ? (
-          <p className="text-center text-green-600">{message}</p>
+          // 👇 CAMBIO 3: Mensaje de éxito (usamos el azul secundario)
+          <p className="text-center" style={{ color: '#3c527a' }}>{message}</p>
         ) : (
           <form onSubmit={handleRegister} className="space-y-6">
             <div>
+              {/* 👇 CAMBIO 4: Etiquetas */}
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
+                className="block text-sm font-medium"
+                style={{ color: '#383838' }}
               >
                 Email
               </label>
@@ -59,11 +70,12 @@ export default function RegisterPage() {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
               />
             </div>
-
+  
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
+                className="block text-sm font-medium"
+                style={{ color: '#383838' }}
               >
                 Contraseña
               </label>
@@ -79,14 +91,20 @@ export default function RegisterPage() {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
               />
             </div>
-
-            {error && <p className="text-sm text-red-600">{error}</p>}
-
+  
+            {/* 👇 CAMBIO 5: Mensaje de error (usamos el naranja primario) */}
+            {error && <p className="text-sm" style={{ color: '#ff8080' }}>{error}</p>}
+  
             <div>
+              {/* 👇 CAMBIO 6: Botón principal */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: loading ? '#FCA5A5' : '#ff8080',
+                  cursor: loading ? 'not-allowed' : 'pointer'
+                }}
               >
                 {loading ? 'Registrando...' : 'Registrarse'}
               </button>
@@ -95,5 +113,5 @@ export default function RegisterPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

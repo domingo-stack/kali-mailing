@@ -10,27 +10,28 @@ export default function Navbar() {
   const { user, supabase } = useAuth()
   const [role, setRole] = useState<string | null>(null);
   const router = useRouter()
+  // El estado de teamName no se usa en el JSX, pero mantenemos la lógica por si acaso.
   const [teamName, setTeamName] = useState<string | null>(null);
 
 
-useEffect(() => {
-  if (user && supabase) {
-    const getNavbarData = async () => {
-      const { data, error } = await supabase.rpc('get_user_role_and_team_info');
+  useEffect(() => {
+    if (user && supabase) {
+      const getNavbarData = async () => {
+        const { data, error } = await supabase.rpc('get_user_role_and_team_info');
 
-      if (error) {
-        console.error("Error fetching navbar data:", error);
-      } else if (data && data.length > 0) {
-        setRole(data[0].role);
-        setTeamName(data[0].team_name);
-      }
-    };
-    getNavbarData();
-  } else {
-    setRole(null);
-    setTeamName(null);
-  }
-}, [user, supabase]); // Se ejecuta cada vez que el usuario cambia
+        if (error) {
+          console.error("Error fetching navbar data:", error);
+        } else if (data && data.length > 0) {
+          setRole(data[0].role);
+          setTeamName(data[0].team_name);
+        }
+      };
+      getNavbarData();
+    } else {
+      setRole(null);
+      setTeamName(null);
+    }
+  }, [user, supabase]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
@@ -57,7 +58,9 @@ useEffect(() => {
                 {role === 'Dueño' && (
                   <Link
                     href="/settings/team"
-                    className="px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                    className="px-3 py-2 text-sm font-medium rounded-md"
+                    // 👇 Color Naranja Hardcodeado
+                    style={{ backgroundColor: '#ff8080', color: 'white' }}
                   >
                     Invitar
                   </Link>
@@ -65,17 +68,27 @@ useEffect(() => {
                 <span className="text-sm text-gray-600 hidden sm:block">{user.email}</span>
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                  className="px-3 py-2 text-sm font-medium rounded-md"
+                   // 👇 Color Azul Hardcodeado
+                  style={{ backgroundColor: '#3c527a', color: 'white' }}
                 >
                   Cerrar Sesión
                 </button>
               </>
             ) : (
               <>
-                <Link href="/login" className="px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100">
+                <Link
+                  href="/login"
+                  // Estilo de borde con color secundario
+                  className="px-3 py-2 text-sm font-medium text-secondary border border-secondary rounded-md hover:bg-secondary hover:text-white"
+                >
                   Login
                 </Link>
-                <Link href="/register" className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                <Link
+                  href="/register"
+                  // Color primario (naranja) aplicado
+                  className="px-3 py-2 text-sm font-medium text-white bg-primary rounded-md hover:opacity-90"
+                >
                   Registrarse
                 </Link>
               </>

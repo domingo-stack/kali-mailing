@@ -56,12 +56,11 @@ export default function AddTaskForm({ onAddTask, projects, onCancel }: AddTaskFo
 
   return (
     <div className="relative p-6">
-      {/* --- NUEVO: Botón 'X' para cerrar --- */}
       <button onClick={onCancel} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
-
-      <h2 className="text-xl font-bold mb-4">Crear Nueva Tarea</h2>
+  
+      <h2 className="text-xl font-bold mb-4" style={{ color: '#383838' }}>Crear Nueva Tarea</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
           type="text"
@@ -76,7 +75,7 @@ export default function AddTaskForm({ onAddTask, projects, onCancel }: AddTaskFo
           <label className="text-sm font-medium text-gray-500">Descripción</label>
           <RichTextEditor content={description} onChange={setDescription} disabled={false} />
         </div>
-
+  
         <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-4">
           <select value={selectedAssigneeId} onChange={(e) => setSelectedAssigneeId(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
             <option value="">Sin Asignar</option>
@@ -93,11 +92,19 @@ export default function AddTaskForm({ onAddTask, projects, onCancel }: AddTaskFo
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm" />
         </div>
         <div className="flex justify-end space-x-3 pt-4 border-t">
-          {/* --- NUEVO: Botón 'Cancelar' --- */}
           <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
             Cancelar
           </button>
-          <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400">
+          {/* 👇 CAMBIO: Botón principal usa el color de la marca */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-white rounded-md transition-colors"
+            style={{
+              backgroundColor: loading ? '#FCA5A5' : '#ff8080',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
             {loading ? 'Añadiendo...' : 'Añadir Tarea'}
           </button>
         </div>

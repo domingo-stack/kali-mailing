@@ -60,7 +60,12 @@ export default function InviteProjectMembersModal({ projectId, onClose, onMember
 
   return (
     <div className="p-6">
-      <h2 className="text-xl font-bold mb-4">Invitar Miembros al Proyecto</h2>
+      <h2 
+        className="text-xl font-bold mb-4" 
+        style={{ color: '#383838' }}
+      >
+        Invitar Miembros al Proyecto
+      </h2>
       <div className="max-h-60 overflow-y-auto border rounded-md p-2 space-y-2">
         {loading ? (
           <p>Cargando miembros...</p>
@@ -69,17 +74,19 @@ export default function InviteProjectMembersModal({ projectId, onClose, onMember
             <div
               key={member.user_id}
               onClick={() => handleToggleSelection(member.user_id)}
-              className={`flex items-center p-2 rounded-md cursor-pointer ${
-                selectedMembers.includes(member.user_id) ? 'bg-blue-100' : 'hover:bg-gray-50'
-              }`}
+              // 👇 CAMBIO 1: El fondo del miembro seleccionado usa un tono del color primario
+              className={`flex items-center p-2 rounded-md cursor-pointer hover:bg-gray-50`}
+              style={selectedMembers.includes(member.user_id) ? { backgroundColor: '#FFF0F0' } : {}}
             >
               <input
                 type="checkbox"
                 readOnly
                 checked={selectedMembers.includes(member.user_id)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                // 👇 CAMBIO 2: El color del checkbox usa el primario
+                className="h-4 w-4 rounded border-gray-300 focus:ring-orange-500"
+                style={{ accentColor: '#ff8080' }} // La forma moderna de colorear checkboxes
               />
-              <span className="ml-3 text-sm">{member.email}</span>
+              <span className="ml-3 text-sm" style={{ color: '#383838' }}>{member.email}</span>
             </div>
           ))
         ) : (
@@ -87,17 +94,25 @@ export default function InviteProjectMembersModal({ projectId, onClose, onMember
         )}
       </div>
       <div className="flex justify-end space-x-3 pt-4 mt-4 border-t">
-        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">
+        <button 
+          type="button" 
+          onClick={onClose} 
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+        >
           Cancelar
         </button>
         <button
           onClick={handleAddMembers}
           disabled={loading || selectedMembers.length === 0}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md disabled:bg-gray-400"
+          // 👇 CAMBIO 3: Botón de Añadir usa el color primario
+          className="px-4 py-2 text-sm font-medium text-white rounded-md"
+          style={{
+            backgroundColor: (loading || selectedMembers.length === 0) ? '#FCA5A5' : '#ff8080',
+            cursor: (loading || selectedMembers.length === 0) ? 'not-allowed' : 'pointer'
+          }}
         >
           {loading ? 'Añadiendo...' : `Añadir (${selectedMembers.length})`}
         </button>
       </div>
     </div>
-  );
-}
+  );}

@@ -28,15 +28,15 @@ export default function AddProjectForm({ onAddProject, onCancel }: AddProjectFor
 
   return (
     <div className="relative p-6">
-      {/* --- NUEVO: Botón 'X' para cerrar --- */}
       <button onClick={onCancel} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
-
-      <h2 className="text-xl font-bold mb-4">Crear Nuevo Proyecto</h2>
+  
+      <h2 className="text-xl font-bold mb-4" style={{ color: '#383838' }}>Crear Nuevo Proyecto</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">
+          {/* 👇 CAMBIO 1: Color de la etiqueta */}
+          <label htmlFor="projectName" className="block text-sm font-medium" style={{ color: '#383838' }}>
             Nombre del Proyecto
           </label>
           <input
@@ -49,7 +49,8 @@ export default function AddProjectForm({ onAddProject, onCancel }: AddProjectFor
           />
         </div>
         <div>
-          <label htmlFor="projectDescription" className="block text-sm font-medium text-gray-700">
+          {/* 👇 CAMBIO 2: Color de la etiqueta */}
+          <label htmlFor="projectDescription" className="block text-sm font-medium" style={{ color: '#383838' }}>
             Descripción (Opcional)
           </label>
           <textarea
@@ -68,10 +69,15 @@ export default function AddProjectForm({ onAddProject, onCancel }: AddProjectFor
           >
             Cancelar
           </button>
+          {/* 👇 CAMBIO 3: Botón principal usa el color de la marca */}
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+            className="px-4 py-2 text-sm font-medium text-white rounded-md transition-colors"
+            style={{
+              backgroundColor: loading ? '#FCA5A5' : '#ff8080',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
           >
             {loading ? 'Creando...' : 'Crear Proyecto'}
           </button>

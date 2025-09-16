@@ -25,7 +25,13 @@ export default function KanbanColumn({ id, title, tasks, onUpdate, onDelete, onS
       ref={setNodeRef}
       className={`rounded-lg p-4 flex flex-col transition-colors ${columnBackgroundColor}`}
     >
-      <h2 className="font-bold text-lg mb-4 text-gray-700">{title} ({tasks.length})</h2>
+      {/* 👇 CAMBIO: Título de la columna usa el color de texto de la marca */}
+      <h2 
+        className="font-bold text-lg mb-4" 
+        style={{ color: '#383838' }}
+      >
+        {title} ({tasks.length})
+      </h2>
       
       <SortableContext items={tasks} strategy={verticalListSortingStrategy}>
         <div className="space-y-4 flex-grow min-h-[100px]">

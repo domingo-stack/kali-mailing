@@ -1,29 +1,26 @@
 @import "tailwindcss";
 
+/* TEMA CLARO */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F8F8F8;
+  --foreground: #383838;
+  --primary: #ff8080;    /* <-- CAMBIO A HEX */
+  --secondary: #3c527a;  /* <-- CAMBIO A HEX */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* TEMA OSCURO (DARK MODE) */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1C1C1C;
+    --foreground: #E5E5E5;
   }
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background); /* <-- Usamos var() simple */
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
+
 /* Estilos para el nuevo componente de Menciones Personalizado */
 .mentions-container {
   position: relative;
@@ -32,7 +29,7 @@ body {
 
 .suggestions-list {
   position: absolute;
-  background-color: white;
+  background-color: #eff6ff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
@@ -51,4 +48,22 @@ body {
 
 .suggestion-item:hover {
   background-color: #eff6ff;
+}
+/* Regla para colorear los links dentro del Activity Feed */
+.activity-feed-container li a {
+  color: #ff8080; /* Nuestro color primario */
+  font-weight: 600; /* Hacemos que resalte un poco */
+}
+
+.activity-feed-container li a:hover {
+  text-decoration: underline;
+}
+/* Estilos para el modal de eliminación de proyectos */
+.delete-option-danger:has(input:checked) {
+  background-color: #FFF0F0; /* Fondo Naranja Claro */
+  border-color: #ff8080;     /* Borde Naranja */
+}
+.delete-option-safe:has(input:checked) {
+  background-color: #EBF0F7; /* Fondo Azul Claro */
+  border-color: #3c527a;     /* Borde Azul */
 }

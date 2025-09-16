@@ -94,52 +94,54 @@ export default function DeleteProjectModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center">
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-2">Eliminar Proyecto</h2>
+        <h2 className="text-xl font-bold mb-2" style={{ color: '#383838' }}>Eliminar Proyecto</h2>
         <p className="mb-4 text-gray-600">
-          Estás a punto de eliminar el proyecto: <strong className="text-red-600">{projectToDelete.name}</strong>.
+          Estás a punto de eliminar el proyecto: <strong style={{ color: '#ff8080' }}>{projectToDelete.name}</strong>.
           Esta acción no se puede deshacer.
         </p>
-
-        {/* Opciones de Borrado */}
+  
         <div className="space-y-4">
-          <label className="flex items-center p-3 border rounded-md has-[:checked]:bg-red-50 has-[:checked]:border-red-400">
+          {/* 👇 CAMBIO 1: Opción de Eliminar (Peligrosa) */}
+          <label className="flex items-center p-3 border rounded-md delete-option-danger transition-colors">
             <input
               type="radio"
               name="deleteOption"
               value="delete"
               checked={deleteOption === 'delete'}
               onChange={() => setDeleteOption('delete')}
-              className="h-4 w-4 text-red-600 border-gray-300 focus:ring-red-500"
+              className="h-4 w-4 border-gray-300 focus:ring-orange-500"
+              style={{ accentColor: '#ff8080' }}
             />
             <span className="ml-3 text-sm">
-              <strong className="block">Eliminar todo permanentemente</strong>
+              <strong className="block" style={{ color: '#383838' }}>Eliminar todo permanentemente</strong>
               Se borrarán el proyecto y todas sus tareas asociadas.
             </span>
           </label>
-
-          <label className="flex items-center p-3 border rounded-md has-[:checked]:bg-blue-50 has-[:checked]:border-blue-400">
+  
+          {/* 👇 CAMBIO 2: Opción de Mover (Segura) */}
+          <label className="flex items-center p-3 border rounded-md delete-option-safe transition-colors">
             <input
               type="radio"
               name="deleteOption"
               value="migrate"
               checked={deleteOption === 'migrate'}
               onChange={() => setDeleteOption('migrate')}
-              className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              className="h-4 w-4 border-gray-300 focus:ring-blue-500"
+              style={{ accentColor: '#3c527a' }}
               disabled={availableProjectsForMigration.length === 0}
             />
             <span className="ml-3 text-sm">
-              <strong className="block">Mover tareas y eliminar proyecto</strong>
+              <strong className="block" style={{ color: '#383838' }}>Mover tareas y eliminar proyecto</strong>
               Las tareas se moverán a otro proyecto antes de eliminar este.
             </span>
           </label>
           
-          {/* Dropdown para migrar, solo visible si se elige esa opción */}
           {deleteOption === 'migrate' && (
             <div className="pl-4">
               <select
                 value={destinationProjectId}
                 onChange={(e) => setDestinationProjectId(e.target.value)}
-                className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 border rounded-md focus:ring-2 focus:ring-orange-500"
               >
                 <option value="">Selecciona un proyecto de destino...</option>
                 {availableProjectsForMigration.map((p) => (
@@ -149,10 +151,9 @@ export default function DeleteProjectModal({
             </div>
           )}
         </div>
-
-        {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
-
-        {/* Botones de Acción */}
+  
+        {error && <p className="text-sm mt-4" style={{ color: '#ff8080' }}>{error}</p>}
+  
         <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onClose}
@@ -161,10 +162,15 @@ export default function DeleteProjectModal({
           >
             Cancelar
           </button>
+          {/* 👇 CAMBIO 3: Botón de Confirmar (Peligroso) */}
           <button
             onClick={handleConfirmDelete}
-            className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 disabled:bg-red-300 flex items-center"
+            className="px-4 py-2 text-white rounded-md text-sm font-semibold flex items-center transition-colors"
             disabled={isDeleting || (deleteOption === 'migrate' && !destinationProjectId)}
+            style={{
+              backgroundColor: (isDeleting || (deleteOption === 'migrate' && !destinationProjectId)) ? '#FCA5A5' : '#ff8080',
+              cursor: (isDeleting || (deleteOption === 'migrate' && !destinationProjectId)) ? 'not-allowed' : 'pointer'
+            }}
           >
             <TrashIcon className="w-4 h-4 mr-2"/>
             {isDeleting ? 'Eliminando...' : 'Confirmar Eliminación'}

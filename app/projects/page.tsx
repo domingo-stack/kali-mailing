@@ -121,50 +121,66 @@ const handleAddProject = async (projectData: { name: string; description: string
   }
 };
 
-  return (
-    <AuthGuard>
-      <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Mis Proyectos</h1>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700"
-          >
-            <PlusIcon className="h-5 w-5" />
-            Nuevo Proyecto
-          </button>
-        </div>
+return (
+  <AuthGuard>
+    <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="flex justify-between items-center mb-8">
+        {/* 👇 CAMBIO 1: Título de la página */}
+        <h1 
+          className="text-3xl font-bold" 
+          style={{ color: '#383838' }}
+        >
+          Mis Proyectos
+        </h1>
+        {/* 👇 CAMBIO 2: Botón "Nuevo Proyecto" */}
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-md transition-opacity"
+          style={{ backgroundColor: '#ff8080' }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+        >
+          <PlusIcon className="h-5 w-5" />
+          Nuevo Proyecto
+        </button>
+      </div>
 
-        {loading ? (
-          <p>Cargando proyectos...</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {projects.length > 0 ? (
-              projects.map(project => (
-                <Link
-                  href={`/projects/${project.id}`}
-                  key={project.id}
-                  className="block p-6 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
+      {loading ? (
+        <p>Cargando proyectos...</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {projects.length > 0 ? (
+            projects.map(project => (
+              <Link
+                href={`/projects/${project.id}`}
+                key={project.id}
+                className="block p-6 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              >
+                {/* 👇 CAMBIO 3: Título de la tarjeta del proyecto */}
+                <h2 
+                  className="text-xl font-bold" 
+                  style={{ color: '#383838' }}
                 >
-                  <h2 className="text-xl font-bold text-gray-900">{project.name}</h2>
-                  <p className="mt-2 text-sm text-gray-600 truncate">{project.description || 'Sin descripción'}</p>
-                </Link>
-              ))
-            ) : (
-              <p className="col-span-full text-center text-gray-500 py-16">
-                No tienes proyectos. ¡Crea el primero!
-              </p>
-            )}
-          </div>
-        )}
-      </main>
+                  {project.name}
+                </h2>
+                <p className="mt-2 text-sm text-gray-600 truncate">{project.description || 'Sin descripción'}</p>
+              </Link>
+            ))
+          ) : (
+            <p className="col-span-full text-center text-gray-500 py-16">
+              No tienes proyectos. ¡Crea el primero!
+            </p>
+          )}
+        </div>
+      )}
+    </main>
 
-      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)}>
-        <AddProjectForm
-          onAddProject={handleAddProject}
-          onCancel={() => setIsCreateModalOpen(false)}
-        />
-      </Modal>
-    </AuthGuard>
-  );
+    <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)}>
+      <AddProjectForm
+        onAddProject={handleAddProject}
+        onCancel={() => setIsCreateModalOpen(false)}
+      />
+    </Modal>
+  </AuthGuard>
+);
 }
