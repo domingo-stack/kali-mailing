@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Task, Comment, Project, TeamMember, Collaborator } from '@/lib/types'
 import AddTaskForm from '@/components/AddTaskForm'
@@ -17,6 +17,8 @@ import InviteProjectMembersModal from '@/components/InviteProjectMembersModal'
 import { TaskUpdatePayload } from '@/lib/types';
 import { CollaboratorRecord } from '@/lib/types'; // O la ruta correcta a tu archivo
 import DeleteProjectModal from '@/components/DeleteProjectModal';
+import { DndContext, DragEndEvent, DragOverlay, rectIntersection, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import KanbanColumn from '@/components/KanbanColumn'; // Ya deberías tener este
 
 type FilterType = 'alDia' | 'atrasadas' | 'finalizadas';
 
@@ -38,59 +40,143 @@ export default function MyTasksPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [invitingToProject, setInvitingToProject] = useState<Project | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<ProjectWithMembers | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const KANBAN_COLUMNS = ['Por Hacer', 'En Progreso', 'Hecho'];
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const isInitialMount = useRef(true);
+  
 
-  const fetchData = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
+  // Este useEffect se encarga de cargar la vista preferida del usuario
+// Este useEffect se encarga de cargar la vista preferida del usuario
+// Este useEffect se encarga de GUARDAR la preferencia cuando el usuario la cambia
+useEffect(() => {
+  // Si es la primera vez que se carga el componente, no hacemos nada.
+  if (isInitialMount.current) {
+    isInitialMount.current = false;
+    return;
+  }
 
-    const [tasksResponse, membersResponse, projectsResponse] = await Promise.all([
-      supabase.rpc('get_my_assigned_tasks_with_projects'),
-      supabase.rpc('get_team_members'),
-      supabase.rpc('get_projects_with_members')
-    ]);
+  // A partir de la segunda vez (cuando el usuario hace clic), sí guardamos.
+  const updateUserPreference = async () => {
+    if (user && supabase && viewMode) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ default_view: viewMode })
+        .eq('id', user.id);
 
-    const { data: allMyTasks, error: tasksError } = tasksResponse;
-    const { data: membersData, error: membersError } = membersResponse;
-    const { data: projectsData, error: projectsError } = projectsResponse;
-
-    if (tasksError || membersError || projectsError) {
-      console.error({ tasksError, membersError, projectsError });
-      setLoading(false);
-      return;
+      if (error) {
+        console.error('Error updating user view preference:', error);
+      }
     }
-    
-    setTeamMembers(membersData || []);
-    setProjects(projectsData as ProjectWithMembers[] || []);
+  };
+  updateUserPreference();
+}, [viewMode, user, supabase]); // Esta lógica se ejecuta cada vez que el 'user' se carga
+  // Este useEffect se encarga de GUARDAR la preferencia cuando el usuario la cambia
+// Este useEffect se encarga de GUARDAR la preferencia cuando el usuario la cambia // Este espía se activa cada vez que 'viewMode' cambia
 
-    let tasksToDisplay: Task[] = allMyTasks || [];
-    const today = new Date().toISOString().split('T')[0];
+  const handleUnarchiveTask = async (taskId: number) => {
+    // Quita la tarea de la vista de archivados inmediatamente
+    setTasks(tasks.filter(task => task.id !== taskId));
 
-    if (activeFilter === 'alDia') {
-      tasksToDisplay = tasksToDisplay.filter(task => !task.completed && task.due_date && task.due_date >= today);
-    } else if (activeFilter === 'atrasadas') {
-      tasksToDisplay = tasksToDisplay.filter(task => !task.completed && task.due_date && task.due_date < today);
-    } else if (activeFilter === 'finalizadas') {
-      tasksToDisplay = tasksToDisplay.filter(task => task.completed);
+    const { error } = await supabase
+    .from('tasks')
+    .update({ archived_at: null })
+    .eq('id', taskId);
+
+  if (error) {
+    console.error('Error desarchivando la tarea:', error);
+    fetchData(); // Si hay un error, refresca los datos
+  }
+};
+useEffect(() => {
+  const fetchUserPreference = async () => {
+    if (user && supabase) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('default_view')
+        .eq('id', user.id)
+        .single();
+      if (error) {
+        console.error('Error fetching user view preference:', error);
+      } else if (data && (data.default_view === 'list' || data.default_view === 'kanban')) {
+        setViewMode(data.default_view);
+      }
     }
-    
-    const membersMap = new Map(
-      (membersData || [])
-        .filter((member: TeamMember) => member.user_id && member.email)
-        .map((member: TeamMember) => [member.user_id!, member.email!])
-        
-    );
-    const enrichedTasks: Task[] = tasksToDisplay.map((task: Task) => {
-      const assigneeEmail = task.assignee_user_id ? membersMap.get(task.assignee_user_id) : undefined;
-      return {
-        ...task,
-        assignee: typeof assigneeEmail === 'string' ? { email: assigneeEmail } : null,
-      };
-    });
-    setTasks(enrichedTasks);
+  };
+  fetchUserPreference();
+}, [user, supabase]);
+
+// Hook para GUARDAR la preferencia de vista cuando cambia
+useEffect(() => {
+  const updateUserPreference = async () => {
+    if (user && supabase && viewMode) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ default_view: viewMode })
+        .eq('id', user.id);
+      if (error) {
+        console.error('Error updating user view preference:', error);
+      }
+    }
+  };
+  updateUserPreference();
+}, [viewMode, user, supabase]);
+
+const fetchData = useCallback(async () => {
+  if (!user || !supabase) return;
+  setLoading(true);
+
+  // 1. Preparamos la consulta de tareas con el parámetro correcto
+  const tasksQuery = supabase.rpc('get_my_assigned_tasks_with_projects', {
+    p_show_archived: showArchived
+  });
+  
+  // 2. Ejecutamos TODAS las consultas juntas para mayor eficiencia
+  const [tasksResponse, membersResponse, projectsResponse] = await Promise.all([
+    tasksQuery,
+    supabase.rpc('get_team_members'),
+    supabase.rpc('get_projects_with_members')
+  ]);
+
+  // 3. Desestructuramos los resultados de forma segura
+  const { data: allMyTasks, error: tasksError } = tasksResponse;
+  const { data: membersData, error: membersError } = membersResponse;
+  const { data: projectsData, error: projectsError } = projectsResponse;
+
+  if (tasksError || membersError || projectsError) {
+    console.error({ tasksError, membersError, projectsError });
     setLoading(false);
-  }, [user, activeFilter]);
+    return;
+  }
+  
+  // ...el resto de la función para procesar los datos se queda igual...
+  setTeamMembers(membersData || []);
+  setProjects(projectsData as ProjectWithMembers[] || []);
+  let tasksToDisplay: Task[] = allMyTasks || [];
+  const today = new Date().toISOString().split('T')[0];
+  if (!showArchived && viewMode === 'list') {
+      if (activeFilter === 'alDia') {
+          tasksToDisplay = tasksToDisplay.filter(task => !task.completed && task.due_date && task.due_date >= today);
+      } else if (activeFilter === 'atrasadas') {
+          tasksToDisplay = tasksToDisplay.filter(task => !task.completed && task.due_date && task.due_date < today);
+      } else if (activeFilter === 'finalizadas') {
+          tasksToDisplay = tasksToDisplay.filter(task => task.completed);
+      }
+  }
+  const membersMap = new Map(
+    (membersData || []).filter((m: TeamMember) => m.user_id && m.email).map((m: TeamMember) => [m.user_id, m.email])
+  );
+  const enrichedTasks = tasksToDisplay.map(task => ({
+    ...task,
+    assignee: task.assignee_user_id ? { email: String(membersMap.get(task.assignee_user_id) || '') } : null,
+  }));
+  setTasks(enrichedTasks);
+  setLoading(false);
+}, 
+[user, supabase, activeFilter, showArchived, viewMode]);
 
-  useEffect(() => {
+useEffect(() => {
     if (user) {
       fetchData();
     }
@@ -168,6 +254,19 @@ export default function MyTasksPage() {
     const { error } = await supabase.from('tasks').update({ deleted_at: new Date().toISOString() }).eq('id', taskId);
     if (error) { console.error('Error soft-deleting task:', error); await fetchData(); }
   };
+
+  const handleArchiveTask = async (taskId: number) => {
+    setTasks(tasks.filter(task => task.id !== taskId));
+    const { error } = await supabase
+      .from('tasks')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', taskId);
+  
+    if (error) {
+      console.error('Error archivando la tarea:', error);
+      fetchData();
+    }
+  }
 
   const handleUpdateTask = async (updatedData: TaskUpdatePayload) => {
     if (!editingTask) return;
@@ -277,116 +376,223 @@ export default function MyTasksPage() {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = Number(active.id);
+    const newStatus = String(over.id);
+
+    // Solo actualizamos si la tarea se movió a una columna diferente
+    if (KANBAN_COLUMNS.includes(newStatus)) {
+      const originalTask = tasks.find(t => t.id === activeId);
+      
+      if (originalTask && originalTask.status !== newStatus) {
+        // Actualización optimista en la UI
+        setTasks(prevTasks =>
+          prevTasks.map(t =>
+            t.id === activeId ? { ...t, status: newStatus } : t
+          )
+        );
+        // Actualización en la base de datos
+        const { error } = await supabase
+          .from('tasks')
+          .update({ status: newStatus })
+          .eq('id', activeId);
+          
+        if (error) {
+          console.error("Error updating task status:", error);
+          fetchData(); // Si hay un error, revierte los cambios
+        }
+      }
+    }
+  };
+
   return (
     <AuthGuard>
-      <main className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-        {/* 👇 CAMBIO 1: Título usa el color de texto de la marca */}
-        <h1 
-          className="text-3xl font-bold mb-8" 
-          style={{ color: '#383838' }}
-        >
-          Mi Dashboard
-        </h1>
+      <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragEnd={handleDragEnd}>
+        <main className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+          <h1 
+            className="text-3xl font-bold mb-8" 
+            style={{ color: '#383838' }}
+          >
+            Mi Dashboard
+          </h1>
   
-        <div className="my-6 border-b border-gray-200">
-          <div className="flex space-x-2">
-            {/* 👇 CAMBIO 2: Botones de filtro usan los colores de la marca */}
-            <button 
-              onClick={() => setActiveFilter('alDia')} 
-              className={`px-4 py-2 text-sm font-medium rounded-t-md`}
-              style={
-                activeFilter === 'alDia' 
-                  ? { borderBottom: '2px solid #ff8080', color: '#ff8080' } // Color Primario
-                  : { color: '#6B7280' } // Gris para inactivo
-              }
-            >
-              Al día
-            </button>
-            <button 
-              onClick={() => setActiveFilter('atrasadas')} 
-              className={`px-4 py-2 text-sm font-medium rounded-t-md`}
-              style={
-                activeFilter === 'atrasadas' 
-                  ? { borderBottom: '2px solid #ff8080', color: '#ff8080' } // Color Primario para atención
-                  : { color: '#6B7280' }
-              }
-            >
-              Atrasadas
-            </button>
-            <button 
-              onClick={() => setActiveFilter('finalizadas')} 
-              className={`px-4 py-2 text-sm font-medium rounded-t-md`}
-              style={
-                activeFilter === 'finalizadas' 
-                  ? { borderBottom: '2px solid #3c527a', color: '#3c527a' } // Color Secundario
-                  : { color: '#6B7280' }
-              }
-            >
-              Finalizadas
-            </button>
+          {/* SECCIÓN DE FILTROS Y VISTAS */}
+          <div className="my-6 border-b border-gray-200">
+            <div className="flex justify-between items-center pb-2 flex-wrap gap-4">
+              <div>
+                {viewMode === 'list' && !showArchived && (
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => setActiveFilter('alDia')} 
+                      className={`px-4 py-2 text-sm font-medium rounded-t-md`}
+                      style={activeFilter === 'alDia' ? { borderBottom: '2px solid #ff8080', color: '#ff8080' } : { color: '#6B7280' }}
+                    >
+                      Al día
+                    </button>
+                    <button 
+                      onClick={() => setActiveFilter('atrasadas')} 
+                      className={`px-4 py-2 text-sm font-medium rounded-t-md`}
+                      style={activeFilter === 'atrasadas' ? { borderBottom: '2px solid #ff8080', color: '#ff8080' } : { color: '#6B7280' }}
+                    >
+                      Atrasadas
+                    </button>
+                    <button 
+                      onClick={() => setActiveFilter('finalizadas')} 
+                      className={`px-4 py-2 text-sm font-medium rounded-t-md`}
+                      style={activeFilter === 'finalizadas' ? { borderBottom: '2px solid #3c527a', color: '#3c527a' } : { color: '#6B7280' }}
+                    >
+                      Finalizadas
+                    </button>
+                  </div>
+                )}
+                {showArchived && (
+                  <h3 className="px-4 py-2 text-sm font-semibold" style={{ color: '#3c527a' }}>
+                    Mostrando Tareas Archivadas
+                  </h3>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center p-1 bg-gray-200 rounded-lg">
+                  <button 
+                    onClick={() => setViewMode('list')}
+                    className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow' : 'text-gray-600'}`}
+                    style={viewMode === 'list' ? {color: '#383838'} : {}}
+                  >
+                    Lista
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('kanban')}
+                    className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-white shadow' : 'text-gray-600'}`}
+                    style={viewMode === 'kanban' ? {color: '#383838'} : {}}
+                  >
+                    Kanban
+                  </button>
+                </div>
+                <div className="flex items-center space-x-2 border-l pl-4">
+                  <input
+                    type="checkbox"
+                    id="showArchived"
+                    checked={showArchived}
+                    onChange={(e) => setShowArchived(e.target.checked)}
+                    disabled={viewMode === 'kanban'}
+                    className="h-4 w-4 rounded border-gray-300 disabled:opacity-50"
+                    style={{ accentColor: '#3c527a' }}
+                  />
+                  <label htmlFor="showArchived" className={`text-sm font-medium ${viewMode === 'kanban' ? 'text-gray-400' : ''}`} style={viewMode !== 'kanban' ? { color: '#383838' } : {}}>
+                    Mostrar archivadas
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        
-        {loading ? <p>Cargando datos del dashboard...</p> : (
-          <div className="space-y-3">
-            {tasks.length > 0 ? tasks.map(task => (<TaskCard key={task.id} task={task} onUpdate={handleTaskCompleted} onDelete={handleDeleteTask} onSelect={handleSelectTask} />)) : (<p className="text-center text-gray-500 py-8">No hay tareas en esta categoría.</p>)}
-          </div>
-        )}
-        
-        <MyProjects projects={projects} onInviteClick={(project) => setInvitingToProject(project)} onDeleteClick={openDeleteModal} />
-        <ActivityFeed />
-      </main>
+          
+          {/* LÓGICA DE RENDERIZADO CORREGIDA */}
+          {loading ? (
+            <p>Cargando datos del dashboard...</p>
+          ) : (
+            <div>
+              {/* VISTA DE LISTA */}
+              {viewMode === 'list' && (
+                <div className="space-y-3">
+                  {tasks.length > 0 ? (
+                    tasks.map(task => (
+                      <TaskCard 
+                        key={task.id} 
+                        task={task} 
+                        onUpdate={handleTaskCompleted} 
+                        onDelete={handleDeleteTask} 
+                        onSelect={handleSelectTask} 
+                        onArchive={handleArchiveTask}
+                        onUnarchive={handleUnarchiveTask}
+                        isArchivedView={showArchived}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-500 py-8">No hay tareas en esta categoría.</p>
+                  )}
+                </div>
+              )}
+  
+              {/* VISTA KANBAN */}
+              {viewMode === 'kanban' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {KANBAN_COLUMNS.map(status => (
+                    <KanbanColumn
+                      key={status}
+                      id={status}
+                      title={status}
+                      tasks={tasks.filter(t => t.status === status)}
+                      onUpdate={handleTaskCompleted}
+                      onDelete={handleDeleteTask}
+                      onSelect={handleSelectTask}
+                      onArchive={handleArchiveTask}
+                      onUnarchive={handleUnarchiveTask}
+                      isArchivedView={false}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
+          <MyProjects projects={projects} onInviteClick={(project) => setInvitingToProject(project)} onDeleteClick={openDeleteModal} />
+          <ActivityFeed />
+        </main>
       
-      {/* ... (el resto de tu código de Modales y CreateButton se queda igual) ... */}
+      {/* ... El resto de tu código de Modales y CreateButton se queda igual ... */}
       <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>
-          {editingTask && (
-            <EditTaskForm 
-              task={editingTask} 
-              projects={projects} 
-              comments={comments} 
-              collaborators={collaborators}
-              currentUser={user}
-              isSaving={isSaving}
-              onSave={handleUpdateTask} 
-              onCancel={() => setEditingTask(null)} 
-              onCommentAdd={handleCommentAdd} 
-              onToggleComplete={handleTaskCompleted} 
-              onCollaboratorAdd={handleCollaboratorAdd}
-              onCollaboratorRemove={handleCollaboratorRemove}
-            />
-          )}
-        </Modal>
-        <Modal isOpen={!!createModalContent} onClose={closeCreateModal}>
-          {createModalContent === 'task' && (<AddTaskForm onAddTask={handleAddTask} projects={projects} onCancel={closeCreateModal} />)}
-          {createModalContent === 'project' && (<AddProjectForm onAddProject={handleAddProject} onCancel={closeCreateModal} />)}
-        </Modal>
-        <Modal isOpen={!!invitingToProject} onClose={() => setInvitingToProject(null)}>
-          {invitingToProject && (
-            <InviteProjectMembersModal
-              projectId={invitingToProject.id}
-              onClose={() => setInvitingToProject(null)}
-              onMembersAdded={() => {
-                fetchData();
-                setInvitingToProject(null);
-              }}
-            />
-          )}
-        </Modal>
-        <DeleteProjectModal
-          isOpen={!!projectToDelete}
-          onClose={() => setProjectToDelete(null)}
-          projectToDelete={projectToDelete}
-          allProjects={projects}
-          onProjectDeleted={() => {
-            fetchData(); 
-            setProjectToDelete(null);
-          }}
-        />
+        {editingTask && (
+          <EditTaskForm 
+            task={editingTask} 
+            projects={projects} 
+            comments={comments} 
+            collaborators={collaborators}
+            currentUser={user}
+            isSaving={isSaving}
+            onSave={handleUpdateTask} 
+            onCancel={() => setEditingTask(null)} 
+            onCommentAdd={handleCommentAdd} 
+            onToggleComplete={handleTaskCompleted} 
+            onCollaboratorAdd={handleCollaboratorAdd} 
+            onCollaboratorRemove={handleCollaboratorRemove}
+          />
+        )}
+      </Modal>
+      <Modal isOpen={!!createModalContent} onClose={closeCreateModal}>
+        {createModalContent === 'task' && (<AddTaskForm onAddTask={handleAddTask} projects={projects} onCancel={closeCreateModal} />)}
+        {createModalContent === 'project' && (<AddProjectForm onAddProject={handleAddProject} onCancel={closeCreateModal} />)}
+      </Modal>
+      <Modal isOpen={!!invitingToProject} onClose={() => setInvitingToProject(null)}>
+        {invitingToProject && (
+          <InviteProjectMembersModal
+            projectId={invitingToProject.id}
+            onClose={() => setInvitingToProject(null)}
+            onMembersAdded={() => {
+              fetchData();
+              setInvitingToProject(null);
+            }}
+          />
+        )}
+      </Modal>
+      <DeleteProjectModal
+        isOpen={!!projectToDelete}
+        onClose={() => setProjectToDelete(null)}
+        projectToDelete={projectToDelete}
+        allProjects={projects}
+        onProjectDeleted={() => {
+          fetchData(); 
+          setProjectToDelete(null);
+        }}
+      />
   
-        <CreateButton 
-          onNewTask={() => setCreateModalContent('task')} 
-          onNewProject={() => setCreateModalContent('project')} 
-        />
+      <CreateButton 
+        onNewTask={() => setCreateModalContent('task')} 
+        onNewProject={() => setCreateModalContent('project')} 
+      />
+      
+      </DndContext>
     </AuthGuard>
-  );
-}
+  );}

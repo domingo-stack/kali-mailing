@@ -13,9 +13,12 @@ type KanbanColumnProps = {
   onUpdate: (task: Task) => void;
   onDelete: (taskId: number) => void;
   onSelect: (task: Task) => void;
+  onArchive: (taskId: number) => void;
+  onUnarchive: (taskId: number) => void;
+  isArchivedView?: boolean;
 };
 
-export default function KanbanColumn({ id, title, tasks, onUpdate, onDelete, onSelect }: KanbanColumnProps) {
+export default function KanbanColumn({ id, title, tasks, onUpdate, onDelete, onSelect, onArchive, onUnarchive, isArchivedView = false }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   const columnBackgroundColor = isOver ? 'bg-blue-100' : 'bg-gray-100';
@@ -43,6 +46,10 @@ export default function KanbanColumn({ id, title, tasks, onUpdate, onDelete, onS
                 onUpdate={onUpdate}
                 onDelete={onDelete}
                 onSelect={onSelect}
+                onArchive={onArchive}
+                onUnarchive={onUnarchive}
+                isArchivedView={isArchivedView}
+
               />
             ))
           ) : (

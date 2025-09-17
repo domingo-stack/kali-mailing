@@ -23,6 +23,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   // En app/projects/page.tsx
 
@@ -59,10 +60,20 @@ const fetchData = useCallback(async () => {
     }
 
     // 3. Pedimos los proyectos SOLAMENTE de ese equipo activo.
-    const { data: projectsData, error: projectsError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('team_id', profileData.active_team_id);
+    let query = supabase
+    .from('projects')
+    .select('*')
+    .eq('team_id', profileData.active_team_id);
+  
+  // 4. Añadimos el filtro de archivado dinámicamente
+  if (showArchived) {
+    query = query.not('archived_at', 'is', null); // Pedimos los archivados
+  } else {
+    query = query.is('archived_at', null); // Pedimos los activos
+  }
+  
+  
+  const { data: projectsData, error: projectsError } = await query;
     
     if (projectsError) {
       console.error('Error fetching projects:', projectsError);
@@ -79,7 +90,7 @@ const fetchData = useCallback(async () => {
     //    sin importar si hubo éxito o error.
     setLoading(false);
   }
-}, [user, supabase]);
+}, [user, supabase, showArchived]);
 
  useEffect(() => {
     fetchData();
@@ -120,29 +131,56 @@ const handleAddProject = async (projectData: { name: string; description: string
     setIsCreateModalOpen(false);
   }
 };
+const handleUnarchiveProject = async (projectId: number) => {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('projects')
+    .update({ archived_at: null }) // Ponemos la fecha de archivado en null
+    .eq('id', projectId);
+
+  if (error) {
+    alert('Error al desarchivar el proyecto: ' + error.message);
+  } else {
+    await fetchData(); // Refrescamos la lista para que el proyecto desaparezca de la vista
+  }
+};
 
 return (
   <AuthGuard>
     <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
       <div className="flex justify-between items-center mb-8">
-        {/* 👇 CAMBIO 1: Título de la página */}
-        <h1 
-          className="text-3xl font-bold" 
-          style={{ color: '#383838' }}
-        >
-          Mis Proyectos
+        <h1 className="text-3xl font-bold" style={{ color: '#383838' }}>
+          {showArchived ? 'Proyectos Archivados' : 'Mis Proyectos'}
         </h1>
-        {/* 👇 CAMBIO 2: Botón "Nuevo Proyecto" */}
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-md transition-opacity"
-          style={{ backgroundColor: '#ff8080' }}
-          onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-          onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-        >
-          <PlusIcon className="h-5 w-5" />
-          Nuevo Proyecto
-        </button>
+        <div className="flex items-center gap-4">
+          {/* Checkbox to show archived projects */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="showArchivedProjects"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+              style={{ accentColor: '#3c527a' }}
+            />
+            <label htmlFor="showArchivedProjects" className="text-sm font-medium" style={{ color: '#383838' }}>
+              Mostrar archivados
+            </label>
+          </div>
+          {/* The "New Project" button is only shown if we are NOT viewing the archived projects */}
+          {!showArchived && (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-md transition-opacity"
+              style={{ backgroundColor: '#ff8080' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            >
+              <PlusIcon className="h-5 w-5" />
+              Nuevo Proyecto
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -151,24 +189,33 @@ return (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {projects.length > 0 ? (
             projects.map(project => (
-              <Link
-                href={`/projects/${project.id}`}
-                key={project.id}
-                className="block p-6 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              <div 
+                  key={project.id}
+                  className="block p-6 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow relative"
               >
-                {/* 👇 CAMBIO 3: Título de la tarjeta del proyecto */}
-                <h2 
-                  className="text-xl font-bold" 
-                  style={{ color: '#383838' }}
-                >
-                  {project.name}
-                </h2>
-                <p className="mt-2 text-sm text-gray-600 truncate">{project.description || 'Sin descripción'}</p>
-              </Link>
+                <Link href={`/projects/${project.id}`} className="block">
+                  <h2 className="text-xl font-bold" style={{ color: '#383838' }}>{project.name}</h2>
+                  <p className="mt-2 text-sm text-gray-600 truncate">{project.description || 'Sin descripción'}</p>
+                </Link>
+                {/* 👇 CORRECTED BUTTON: Unarchive button, only visible in the archived view */}
+                {showArchived && (
+                  <button 
+                    onClick={() => handleUnarchiveProject(project.id)}
+                    className="absolute top-4 right-4 text-gray-400 transition-colors p-1" 
+                    title="Desarchivar proyecto"
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#3c527a'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#9CA3AF'}
+                  >
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M7 9a7 7 0 0110-5.46M20 20v-5h-5M17 15a7 7 0 01-10 5.46" />
+                      </svg>
+                  </button>
+                )}
+              </div>
             ))
           ) : (
             <p className="col-span-full text-center text-gray-500 py-16">
-              No tienes proyectos. ¡Crea el primero!
+              {showArchived ? 'No tienes proyectos archivados.' : 'No tienes proyectos. ¡Crea el primero!'}
             </p>
           )}
         </div>
@@ -182,5 +229,4 @@ return (
       />
     </Modal>
   </AuthGuard>
-);
-}
+);}

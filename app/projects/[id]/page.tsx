@@ -58,48 +58,76 @@ export default function ProjectDetailPage() {
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const handleArchiveTask = async (taskId: number) => {
+    // Quita la tarea de la vista inmediatamente
+    setTasks(tasks.filter(task => task.id !== taskId));
+    const { error } = await supabase
+    .from('tasks')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', taskId);
 
-  const fetchData = useCallback(async () => {
-    if (!projectId || !user || !supabase) {
-        setLoading(false);
-        return;
-    }
-    setLoading(true);
-    
-    // Usamos RLS para filtrar proyectos, así que la consulta directa es segura
-    const [projectRes, membersRes, tasksRes, allProjectsRes, teamMembersRes] = await Promise.all([
-      supabase.from('projects').select('*').eq('id', projectId).single(),
-      supabase.rpc('get_project_members', { p_project_id: projectId }),
-      supabase.from('tasks').select('*, projects(id, name)').eq('project_id', projectId).is('deleted_at', null),
-      supabase.from('projects').select('*'), // Para opciones de migración, etc.
-      supabase.rpc('get_team_members_by_active_team')
-    ]);
-    
-    if (projectRes.error) {
-        console.error("Error fetching project details:", projectRes.error);
-        setProject(null); // Si no hay proyecto, no seguimos
-    } else {
-        setProject(projectRes.data);
-    }
+  if (error) {
+    console.error('Error archivando la tarea:', error);
+    fetchData(); // Si hay un error, refresca los datos para revertir el cambio
+  }
+};const [showArchived, setShowArchived] = useState(false);
 
-    if (membersRes.data) setProjectMembers(membersRes.data);
-    if (allProjectsRes.data) setAllProjects(allProjectsRes.data);
-    if (teamMembersRes.data) setTeamMembers(teamMembersRes.data);
-    
-    // Enriquecer tareas con email de asignado
-    if (tasksRes.data && teamMembersRes.data) {
-        const membersMap = new Map(teamMembersRes.data.map((m: TeamMember) => [m.user_id, m.email]));
-        const enrichedTasks = tasksRes.data.map((task: Task) => ({
-            ...task,
-            assignee: task.assignee_user_id
-              ? { email: String(membersMap.get(task.assignee_user_id) || '') }
-              : null
-        }));
-        setTasks(enrichedTasks);
-    }
+const fetchData = useCallback(async () => {
+  if (!projectId || !user || !supabase) {
+      setLoading(false);
+      return;
+  }
+  setLoading(true);
+  
+  // 1. Preparamos la consulta de tareas SIN el join a profiles
+  let tasksQuery = supabase
+    .from('tasks')
+    .select('*, projects(id, name)')
+    .eq('project_id', projectId)
+    .is('deleted_at', null);
+  
+  if (showArchived) {
+    tasksQuery = tasksQuery.not('archived_at', 'is', null);
+  } else {
+    tasksQuery = tasksQuery.is('archived_at', null);
+  }
 
-    setLoading(false);
-  }, [user, projectId, supabase]);
+  const [projectRes, membersRes, tasksRes, allProjectsRes, teamMembersRes] = await Promise.all([
+    supabase.from('projects').select('*').eq('id', projectId).single(),
+    supabase.rpc('get_project_members', { p_project_id: projectId }),
+    tasksQuery,
+    supabase.from('projects').select('*'),
+    supabase.rpc('get_team_members_by_active_team') // Pedimos todos los miembros del equipo
+  ]);
+  
+  // Procesamos los resultados
+  if (projectRes.error) {
+      console.error("Error fetching project details:", projectRes.error);
+      setProject(null);
+  } else {
+      setProject(projectRes.data);
+  }
+
+  // 2. Aquí está la clave: enriquecemos las tareas manualmente
+  if (tasksRes.data && teamMembersRes.data) {
+      const membersMap = new Map(teamMembersRes.data.map((m: TeamMember) => [m.user_id, m.email]));
+      const enrichedTasks = tasksRes.data.map((task: Task) => ({
+          ...task,
+          assignee: task.assignee_user_id
+            ? { email: String(membersMap.get(task.assignee_user_id) || '') }
+            : null
+      }));
+      setTasks(enrichedTasks);
+  } else if (tasksRes.error) {
+      console.error("Error fetching tasks:", tasksRes.error);
+  }
+
+  if (membersRes.data) setProjectMembers(membersRes.data);
+  if (allProjectsRes.data) setAllProjects(allProjectsRes.data);
+  if (teamMembersRes.data) setTeamMembers(teamMembersRes.data);
+  
+  setLoading(false);
+}, [user, projectId, supabase, showArchived]);
 
   useEffect(() => {
     fetchData();
@@ -155,6 +183,27 @@ export default function ProjectDetailPage() {
         setIsCreateTaskModalOpen(false); 
     }
   };
+  const handleArchiveProject = async () => {
+    if (!project) return;
+    
+    const confirmation = window.confirm(
+      `Are you sure you want to archive the project "${project.name}"? All its tasks will be completed and archived as well.`
+    );
+
+    if (confirmation && supabase) {
+      const { error } = await supabase.rpc('archive_project_and_tasks', {
+        p_project_id: project.id,
+      });
+
+      if (error) {
+        alert('Error archiving project: ' + error.message);
+      } else {
+        alert('Project archived successfully!');
+        router.push('/projects'); // Redirect to the projects list
+      }
+    }
+  };
+
     
     
       const handleTaskCompleted = async (taskToUpdate: Task) => {
@@ -183,7 +232,21 @@ export default function ProjectDetailPage() {
     
       };
     
+    const handleUnarchiveTask = async (taskId: number) => {
+      // Quita la tarea de la vista inmediatamente
+      setTasks(tasks.filter(task => task.id !== taskId));
     
+      // Actualiza la base de datos poniendo archived_at en null
+      const { error } = await supabase
+        .from('tasks')
+        .update({ archived_at: null })
+        .eq('id', taskId);
+    
+      if (error) {
+        console.error('Error desarchivando la tarea:', error);
+        fetchData(); // Si hay un error, refresca los datos para revertir
+      }
+    };
     
       const handleUpdateTask = async (updatedData: TaskUpdatePayload) => {
     
@@ -457,7 +520,6 @@ export default function ProjectDetailPage() {
         <div className="bg-gray-50 min-h-screen font-sans">
           <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
             <div className="mb-8">
-              {/* 👇 CAMBIO 1: Enlace "Volver" */}
               <Link 
                 href="/" 
                 className="text-sm"
@@ -469,7 +531,6 @@ export default function ProjectDetailPage() {
               </Link>
               <div className="flex justify-between items-start mt-2">
                 <div>
-                  {/* 👇 CAMBIO 2: Título del Proyecto */}
                   <h1 
                     className="text-3xl font-bold" 
                     style={{ color: '#383838' }}
@@ -478,42 +539,77 @@ export default function ProjectDetailPage() {
                   </h1>
                   <p className="text-gray-600 mt-1">{project.description}</p>
                 </div>
-                <div className="flex items-center gap-2"> 
-                  <Dropdown
-                    label="Filtrar por estado"
-                    options={STATUS_FILTER_OPTIONS}
-                    selectedValue={statusFilter}
-                    onSelect={setStatusFilter}
-                  />
-                  <Dropdown
-                    label="Filtrar por usuario"
-                    options={[
-                      { value: 'all', label: 'Todos los usuarios' },
-                      ...projectMembers.map(member => ({ value: member.user_id, label: member.email })),
-                    ]}
-                    selectedValue={assigneeFilter}
-                    onSelect={setAssigneeFilter}
-                  />
-                  <ProjectDriveLink
-                    projectId={project.id}
-                    driveUrl={project.google_drive_url}
-                    onLinkUpdate={fetchData}
-                  />
-                  <div onClick={() => setIsInviteModalOpen(true)} className="cursor-pointer">
-                    <ProjectMembers members={projectMembers} />
-                  </div>
-                  {user && project.owner_id === user.id && (
-                    // 👇 CAMBIO 3: Botón "Eliminar"
-                    <button 
-                      onClick={() => setProjectToDelete(project)} 
-                      className="p-2 rounded-full text-gray-500 transition-colors" 
-                      title="Eliminar proyecto"
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF0F0'; e.currentTarget.style.color = '#ff8080'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6B7280'; }}
-                    >
-                      <TrashIcon className="w-5 h-5" />
-                    </button>
-                  )}
+                <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 max-w-lg">
+                    {/* Grupo de Filtros */}
+                    <div className="flex items-center gap-2">
+                        <Dropdown
+                            label="Filtrar por estado"
+                            options={STATUS_FILTER_OPTIONS}
+                            selectedValue={statusFilter}
+                            onSelect={setStatusFilter}
+                        />
+                        <Dropdown
+                            label="Filtrar por usuario"
+                            options={[
+                                { value: 'all', label: 'Todos los usuarios' },
+                                ...projectMembers.map(member => ({ value: member.user_id, label: member.email })),
+                            ]}
+                            selectedValue={assigneeFilter}
+                            onSelect={setAssigneeFilter}
+                        />
+                    </div>
+                    {/* Grupo de Acciones */}
+                    <div className="flex items-center gap-2 border-l pl-4">
+                        <ProjectDriveLink
+                            projectId={project.id}
+                            driveUrl={project.google_drive_url}
+                            onLinkUpdate={fetchData}
+                        />
+                        <div onClick={() => setIsInviteModalOpen(true)} className="cursor-pointer">
+                            <ProjectMembers members={projectMembers} />
+                        </div>
+
+                        {/* 👇 LÓGICA DE BOTONES DE DUEÑO CORREGIDA */}
+                        {user && project.owner_id === user.id && (
+                          <>
+                            <button 
+                              onClick={handleArchiveProject} 
+                              className="p-2 rounded-full text-gray-500 transition-colors" 
+                              title="Archivar proyecto"
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#EBF0F7'; e.currentTarget.style.color = '#3c527a'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6B7280'; }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                              </svg>
+                            </button>
+                            <button 
+                                onClick={() => setProjectToDelete(project)} 
+                                className="p-2 rounded-full text-gray-500 transition-colors" 
+                                title="Eliminar proyecto"
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF0F0'; e.currentTarget.style.color = '#ff8080'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6B7280'; }}
+                            >
+                                <TrashIcon className="w-5 h-5" />
+                            </button>
+                          </>
+                        )}
+
+                        {/* Checkbox de archivadas */}
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                id="showArchivedProject"
+                                checked={showArchived}
+                                onChange={(e) => setShowArchived(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300"
+                                style={{ accentColor: '#3c527a' }}
+                            />
+                            <label htmlFor="showArchivedProject" className="text-sm font-medium" style={{ color: '#383838' }}>
+                                Archivadas
+                            </label>
+                        </div>
+                    </div>
                 </div>
               </div>
             </div>
@@ -528,6 +624,9 @@ export default function ProjectDetailPage() {
                   onUpdate={handleTaskCompleted}
                   onDelete={handleDeleteTask}
                   onSelect={handleSelectTask}
+                  onArchive={handleArchiveTask}
+                  onUnarchive={handleUnarchiveTask}
+                  isArchivedView={showArchived} // Pasamos la prop aquí también
                 />
               ))}
             </div>
@@ -541,7 +640,7 @@ export default function ProjectDetailPage() {
               onCancel={() => setIsCreateTaskModalOpen(false)}
             />
           </Modal>
-  
+
           <DeleteProjectModal
             isOpen={!!projectToDelete}
             onClose={() => setProjectToDelete(null)}
@@ -581,11 +680,11 @@ export default function ProjectDetailPage() {
               }}
             />
           </Modal>
-  
+
           <DragOverlay>
-            {activeTask ? <TaskCard task={activeTask} onUpdate={()=>{}} onDelete={()=>{}} onSelect={()=>{}} /> : null}
+            {activeTask ? <TaskCard task={activeTask} onUpdate={()=>{}} onDelete={()=>{}} onSelect={()=>{}} onArchive={()=>{}} onUnarchive={() => {}} /> : null}
           </DragOverlay>
-  
+
           <CreateButton
             onNewTask={() => setIsCreateTaskModalOpen(true)}
             onNewProject={() => router.push('/projects')} 
