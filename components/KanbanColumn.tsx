@@ -21,14 +21,17 @@ type KanbanColumnProps = {
 export default function KanbanColumn({ id, title, tasks, onUpdate, onDelete, onSelect, onArchive, onUnarchive, isArchivedView = false }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
-  const columnBackgroundColor = isOver ? 'bg-blue-100' : 'bg-gray-100';
+  
 
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-lg p-4 flex flex-col transition-colors ${columnBackgroundColor}`}
+      className="rounded-lg p-4 flex flex-col transition-colors"
+      // 👇 Y la aplicamos con `style` para usar nuestros colores de marca
+      style={{ 
+        backgroundColor: isOver ? '#EBF0F7' : '#F9FAFB' // Azul claro de marca o Gris muy claro
+      }}
     >
-      {/* 👇 CAMBIO: Título de la columna usa el color de texto de la marca */}
       <h2 
         className="font-bold text-lg mb-4" 
         style={{ color: '#383838' }}
@@ -37,7 +40,7 @@ export default function KanbanColumn({ id, title, tasks, onUpdate, onDelete, onS
       </h2>
       
       <SortableContext items={tasks} strategy={verticalListSortingStrategy}>
-        <div className="space-y-4 flex-grow min-h-[100px]">
+      <div className="space-y-3 flex-grow min-h-[100px] max-h-[65vh] overflow-y-auto p-1 pr-2">
           {tasks.length > 0 ? (
             tasks.map(task => (
               <TaskCard 

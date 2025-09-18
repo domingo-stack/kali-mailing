@@ -24,6 +24,7 @@ type FilterType = 'alDia' | 'atrasadas' | 'finalizadas';
 
 // Definimos el tipo Project con los nuevos datos de miembros
 type ProjectWithMembers = Project & { members: { user_id: string; email: string; }[] };
+const KANBAN_COLUMNS = ['Por Hacer', 'En Progreso', 'Hecho'];
 
 export default function MyTasksPage() {
   const { user, supabase } = useAuth();
@@ -42,36 +43,35 @@ export default function MyTasksPage() {
   const [projectToDelete, setProjectToDelete] = useState<ProjectWithMembers | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
-  const KANBAN_COLUMNS = ['Por Hacer', 'En Progreso', 'Hecho'];
+  const [savedViewMode, setSavedViewMode] = useState<'list' | 'kanban'>('list');
+  
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
   const isInitialMount = useRef(true);
   
 
   // Este useEffect se encarga de cargar la vista preferida del usuario
 // Este useEffect se encarga de cargar la vista preferida del usuario
 // Este useEffect se encarga de GUARDAR la preferencia cuando el usuario la cambia
-useEffect(() => {
-  // Si es la primera vez que se carga el componente, no hacemos nada.
-  if (isInitialMount.current) {
-    isInitialMount.current = false;
-    return;
+const handleSaveViewPreference = async () => {
+  if (user && supabase) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ default_view: viewMode })
+      .eq('id', user.id);
+
+    if (error) {
+      alert('Error al guardar la preferencia: ' + error.message);
+    } else {
+      // Actualizamos nuestro estado de "preferencia guardada"
+      setSavedViewMode(viewMode); 
+      alert('¡Preferencia de vista guardada!');
+    }
   }
+};
 
   // A partir de la segunda vez (cuando el usuario hace clic), sí guardamos.
-  const updateUserPreference = async () => {
-    if (user && supabase && viewMode) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ default_view: viewMode })
-        .eq('id', user.id);
-
-      if (error) {
-        console.error('Error updating user view preference:', error);
-      }
-    }
-  };
-  updateUserPreference();
-}, [viewMode, user, supabase]); // Esta lógica se ejecuta cada vez que el 'user' se carga
+  // Esta lógica se ejecuta cada vez que el 'user' se carga
   // Este useEffect se encarga de GUARDAR la preferencia cuando el usuario la cambia
 // Este useEffect se encarga de GUARDAR la preferencia cuando el usuario la cambia // Este espía se activa cada vez que 'viewMode' cambia
 
@@ -89,39 +89,42 @@ useEffect(() => {
     fetchData(); // Si hay un error, refresca los datos
   }
 };
+// Este useEffect se encarga de cargar la vista preferida del usuario
 useEffect(() => {
-  const fetchUserPreference = async () => {
+  const handleViewPreference = async () => {
     if (user && supabase) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('default_view')
-        .eq('id', user.id)
-        .single();
-      if (error) {
-        console.error('Error fetching user view preference:', error);
-      } else if (data && (data.default_view === 'list' || data.default_view === 'kanban')) {
-        setViewMode(data.default_view);
-      }
-    }
-  };
-  fetchUserPreference();
-}, [user, supabase]);
+      // Si es la PRIMERA VEZ que el componente se carga...
+      if (isInitialMount.current) {
+        isInitialMount.current = false; // Bajamos la bandera para futuras ejecuciones
 
-// Hook para GUARDAR la preferencia de vista cuando cambia
-useEffect(() => {
-  const updateUserPreference = async () => {
-    if (user && supabase && viewMode) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ default_view: viewMode })
-        .eq('id', user.id);
-      if (error) {
-        console.error('Error updating user view preference:', error);
+        // ...solamente LEEMOS la preferencia de la base de datos.
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('default_view')
+          .eq('id', user.id)
+          .single();
+
+        if (data && (data.default_view === 'list' || data.default_view === 'kanban')) {
+          setViewMode(data.default_view);
+          setSavedViewMode(data.default_view);
+        }
+      } else {
+        // Si ya NO es la primera carga (el usuario cambió la vista)...
+        // ...solamente GUARDAMOS la nueva preferencia.
+        const { error } = await supabase
+          .from('profiles')
+          .update({ default_view: viewMode })
+          .eq('id', user.id);
+
+        if (error) {
+          console.error('Error updating view preference:', error);
+        }
       }
     }
   };
-  updateUserPreference();
-}, [viewMode, user, supabase]);
+
+  handleViewPreference();
+}, [viewMode, user, supabase]); // Este hook ahora vigila todo
 
 const fetchData = useCallback(async () => {
   if (!user || !supabase) return;
@@ -131,13 +134,15 @@ const fetchData = useCallback(async () => {
   const tasksQuery = supabase.rpc('get_my_assigned_tasks_with_projects', {
     p_show_archived: showArchived
   });
+  const projectsQuery = supabase.rpc('get_projects_with_members');
+    const membersQuery = supabase.rpc('get_team_members');
+
+    const [tasksResponse, membersResponse, projectsResponse] = await Promise.all([
+      tasksQuery,
+      membersQuery,
+      projectsQuery
+    ]);
   
-  // 2. Ejecutamos TODAS las consultas juntas para mayor eficiencia
-  const [tasksResponse, membersResponse, projectsResponse] = await Promise.all([
-    tasksQuery,
-    supabase.rpc('get_team_members'),
-    supabase.rpc('get_projects_with_members')
-  ]);
 
   // 3. Desestructuramos los resultados de forma segura
   const { data: allMyTasks, error: tasksError } = tasksResponse;
@@ -151,8 +156,8 @@ const fetchData = useCallback(async () => {
   }
   
   // ...el resto de la función para procesar los datos se queda igual...
-  setTeamMembers(membersData || []);
   setProjects(projectsData as ProjectWithMembers[] || []);
+  setTeamMembers(membersData || []);
   let tasksToDisplay: Task[] = allMyTasks || [];
   const today = new Date().toISOString().split('T')[0];
   if (!showArchived && viewMode === 'list') {
@@ -181,6 +186,23 @@ useEffect(() => {
       fetchData();
     }
   }, [user, fetchData]);
+
+  const handleToggleFavorite = async (projectId: number) => {
+    const updatedProjects = projects.map(p => 
+      p.id === projectId ? { ...p, is_favorited: !p.is_favorited } : p
+    );
+    updatedProjects.sort((a, b) => {
+      if (a.is_favorited && !b.is_favorited) return -1;
+      if (!a.is_favorited && b.is_favorited) return 1;
+      return 0;
+    });
+    setProjects(updatedProjects);
+    const { error } = await supabase.rpc('toggle_project_favorite', { p_project_id: projectId });
+    if (error) {
+      console.error('Error toggling favorite:', error);
+      fetchData();
+    }
+  };
 
   const closeCreateModal = () => setCreateModalContent(null);
 
@@ -216,6 +238,8 @@ useEffect(() => {
     }
   };
   
+  
+
   const handleAddProject = async (projectData: { name: string; description: string | null }) => {
     if (!user) return;
   
@@ -376,7 +400,17 @@ useEffect(() => {
     }
   };
 
+  const handleDragStart = (event: DragEndEvent) => {
+    const { active } = event;
+    const task = tasks.find(t => t.id === Number(active.id));
+    if (task) {
+      setActiveTask(task);
+    }
+  };
+
+
   const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveTask(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -410,7 +444,7 @@ useEffect(() => {
 
   return (
     <AuthGuard>
-      <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <main className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
           <h1 
             className="text-3xl font-bold mb-8" 
@@ -471,6 +505,21 @@ useEffect(() => {
                     Kanban
                   </button>
                 </div>
+                <button 
+    onClick={handleSaveViewPreference}
+    // El botón se deshabilita si la vista actual ya está guardada
+    disabled={viewMode === savedViewMode} 
+    className="px-3 py-1.5 text-xs font-semibold rounded-md transition-colors disabled:opacity-70"
+    style={
+      viewMode === savedViewMode 
+        // Estilo cuando la vista ya está guardada (sutil)
+        ? { backgroundColor: '#EBF0F7', color: '#3c527a' } 
+        // Estilo cuando hay cambios por guardar (llamativo)
+        : { backgroundColor: '#ff8080', color: 'white' }
+    }
+  >
+    {viewMode === savedViewMode ? 'Vista Guardada' : 'Guardar Vista'}
+  </button>
                 <div className="flex items-center space-x-2 border-l pl-4">
                   <input
                     type="checkbox"
@@ -538,9 +587,26 @@ useEffect(() => {
             </div>
           )}
           
-          <MyProjects projects={projects} onInviteClick={(project) => setInvitingToProject(project)} onDeleteClick={openDeleteModal} />
+          <MyProjects 
+      projects={projects}
+      onFavoriteToggle={handleToggleFavorite} // <-- La conexión clave
+      onInviteClick={(project) => setInvitingToProject(project)} 
+      onDeleteClick={openDeleteModal}
+    />
           <ActivityFeed />
         </main>
+        <DragOverlay>
+          {activeTask ? (
+            <TaskCard 
+              task={activeTask} 
+              onUpdate={()=>{}} 
+              onDelete={()=>{}} 
+              onSelect={()=>{}} 
+              onArchive={()=>{}}
+              onUnarchive={() => {}}
+            />
+          ) : null}
+        </DragOverlay>
       
       {/* ... El resto de tu código de Modales y CreateButton se queda igual ... */}
       <Modal isOpen={!!editingTask} onClose={() => setEditingTask(null)}>

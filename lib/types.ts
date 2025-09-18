@@ -23,6 +23,7 @@ export type TeamMember = {
     team_id: number;
     owner_id: string;
     google_drive_url?: string | null;
+    is_favorited: boolean; 
   };
 
   // Se elimina el tipo 'Subtask'
