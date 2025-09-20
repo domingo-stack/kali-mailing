@@ -1,9 +1,11 @@
 // app/contacts/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import ImportContactsModal from '@/components/ImportContactsModal'; // <-- 1. IMPORTAMOS EL MODAL
+import ImportContactsModal from '@/components/ImportContactsModal';
+import AddContactModal from '@/components/AddContactModal';
+import { useRouter } from 'next/navigation'; // <-- 1. IMPORTAMOS useRouter
 
 type Contact = {
   id: number;
@@ -18,50 +20,58 @@ export default function ContactsPage() {
   const { supabase } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false); // <-- 2. AÑADIMOS ESTADO PARA EL MODAL
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const router = useRouter(); // <-- 2. INICIALIZAMOS EL ROUTER
+
+  const fetchContacts = useCallback(async () => {
+    // ... (el código de fetchContacts se queda igual)
+    if (!supabase) return;
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('id, created_at, email, first_name, last_name, status')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching contacts:', error);
+    } else if (data) {
+      setContacts(data);
+    }
+    setIsLoading(false);
+  }, [supabase]);
 
   useEffect(() => {
-    const fetchContacts = async () => {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('id, created_at, email, first_name, last_name, status');
-
-      if (error) {
-        console.error('Error fetching contacts:', error);
-      } else if (data) {
-        setContacts(data);
-      }
-      setIsLoading(false);
-    };
-
-    if (supabase) {
-        fetchContacts();
-    }
-  }, [supabase]);
+    fetchContacts();
+  }, [fetchContacts]);
+  
+  // 3. FUNCIÓN PARA NAVEGAR AL DETALLE DEL CONTACTO
+  const handleRowClick = (contactId: number) => {
+    router.push(`/contacts/${contactId}`);
+  };
 
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-[#383838]">
-          Contactos
-        </h1>
-        {/* 3. El botón ahora abre el modal */}
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-[#ff8080] text-white font-bold py-2 px-4 rounded-lg hover:opacity-90 transition-opacity"
-        >
-          Importar Contactos (CSV)
-        </button>
+        {/* ... (el código de los botones se queda igual) ... */}
+        <h1 className="text-3xl font-bold text-[#383838]">Contactos</h1>
+        <div className="flex space-x-4">
+          <button onClick={() => setIsAddModalOpen(true)} className="bg-[#3c527a] text-white font-bold py-2 px-4 rounded-lg hover:opacity-90">
+            Añadir Contacto
+          </button>
+          <button onClick={() => setIsImportModalOpen(true)} className="bg-[#ff8080] text-white font-bold py-2 px-4 rounded-lg hover:opacity-90">
+            Importar (CSV)
+          </button>
+        </div>
       </div>
       
       {isLoading ? (
         <p className="text-gray-500">Cargando contactos...</p>
       ) : (
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          {/* ... (el código de la tabla se queda igual) ... */}
           <table className="min-w-full">
             <thead className="bg-gray-50">
+                {/* ... (el thead se queda igual) ... */}
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
@@ -71,7 +81,12 @@ export default function ContactsPage() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {contacts.map((contact) => (
-                <tr key={contact.id} className="hover:bg-gray-50">
+                // 4. AÑADIMOS onClick Y ESTILOS AL <tr>
+                <tr 
+                  key={contact.id} 
+                  className="hover:bg-gray-100 cursor-pointer"
+                  onClick={() => handleRowClick(contact.id)}
+                >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{contact.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contact.first_name} {contact.last_name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contact.status}</td>
@@ -82,20 +97,13 @@ export default function ContactsPage() {
               ))}
             </tbody>
           </table>
-          {contacts.length === 0 && (
-              <div className="text-center p-12 text-gray-500">
-                  <h3 className="text-lg font-medium">No se encontraron contactos</h3>
-                  <p className="mt-1 text-sm">¡Empieza importando tu primer archivo CSV!</p>
-              </div>
-          )}
+          {/* ... (el código de 'No se encontraron contactos' se queda igual) ... */}
         </div>
       )}
 
-      {/* 4. RENDERIZAMOS EL MODAL AQUÍ */}
-      <ImportContactsModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
+      {/* ... (el código de los modales se queda igual) ... */}
+       <ImportContactsModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
+       <AddContactModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onContactAdded={fetchContacts} />
     </div>
   );
 }

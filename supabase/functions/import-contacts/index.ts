@@ -1,6 +1,5 @@
 // supabase/functions/import-contacts/index.ts
 
-// deno-lint-ignore no-import-prefix
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -10,10 +9,31 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // --- INICIO DEL CAMBIO ---
+    // 1. Extraemos el token de autorización del usuario que hace la llamada
+    const authHeader = req.headers.get('Authorization')!
+    const jwt = authHeader.replace('Bearer ', '')
+
+    // 2. Creamos un cliente de Supabase para obtener los datos del usuario a partir del token
+    const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    )
+    const { data: { user } } = await supabaseClient.auth.getUser(jwt)
+    if (!user) {
+      throw new Error("No se pudo identificar al usuario.")
+    }
+    const userId = user.id
+    // --- FIN DEL CAMBIO ---
+
+
     const { contacts } = await req.json()
 
-    if (!contacts || !Array.isArray(contacts)) {
-      throw new Error('Se esperaba un array de contactos.')
+    if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
+      throw new Error('El archivo CSV está vacío o no tiene un formato válido.')
+    }
+    if (!contacts[0].hasOwnProperty('email')) {
+        throw new Error('La cabecera "email" es obligatoria en el archivo CSV.');
     }
 
     const supabaseAdmin = createClient(
@@ -21,15 +41,20 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const validContacts = contacts.map(contact => ({
-      email: contact.email,
-      first_name: contact.first_name || null,
-      last_name: contact.last_name || null,
-      status: contact.status || 'subscribed',
-    })).filter(contact => contact.email);
+    const validContacts = contacts
+      .map(contact => ({
+        email: contact.email,
+        first_name: contact.first_name || null,
+        last_name: contact.last_name || null,
+        status: contact.status || 'subscribed',
+        city: contact.city || null,
+        country: contact.country || null,
+        user_id: userId, // <-- 3. Asignamos la ID del usuario a cada contacto
+      }))
+      .filter(contact => contact.email); 
 
     if (validContacts.length === 0) {
-      throw new Error('No se encontraron contactos válidos para importar.')
+      throw new Error('No se encontraron filas con un email válido en el archivo.')
     }
 
     const { error } = await supabaseAdmin

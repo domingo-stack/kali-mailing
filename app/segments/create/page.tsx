@@ -1,20 +1,40 @@
 // app/segments/create/page.tsx
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function CreateSegmentPage() {
   const { supabase } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [segmentName, setSegmentName] = useState('');
   const [ruleField, setRuleField] = useState('status');
   const [ruleOperator, setRuleOperator] = useState('eq');
   const [ruleValue, setRuleValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const nameFromQuery = searchParams.get('name');
+    const rulesFromQuery = searchParams.get('rules');
+
+    if (nameFromQuery) {
+      setSegmentName(nameFromQuery);
+    }
+    if (rulesFromQuery) {
+      try {
+        const rules = JSON.parse(rulesFromQuery);
+        setRuleField(rules.field || 'status');
+        setRuleOperator(rules.operator || 'eq');
+        setRuleValue(rules.value || '');
+      } catch (error) {
+        console.error("Error al parsear las reglas desde la URL", error);
+      }
+    }
+  }, [searchParams]);
 
   // Determina si el campo seleccionado es de tipo fecha
   const isDateField = ruleField === 'created_at' || ruleField === 'last_modified_at';

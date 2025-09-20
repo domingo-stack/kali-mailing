@@ -14,44 +14,52 @@ export default function ImportContactsModal({ isOpen, onClose }: { isOpen: boole
     if (e.target.files) setFile(e.target.files[0]);
   };
 
-  const handleImport = () => {
-    if (!file) {
-      alert('Por favor, selecciona un archivo CSV.');
-      return;
-    }
-    setIsProcessing(true);
+ // Dentro de components/ImportContactsModal.tsx
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const contactsToImport = results.data;
-        
-        // --- 3. INVOCAMOS LA EDGE FUNCTION ---
-        const { data, error } = await supabase.functions.invoke('import-contacts', {
-          body: { contacts: contactsToImport },
-        });
+const handleImport = async () => { // Asegúrate de que la función sea async
+  if (!file) {
+    alert('Por favor, selecciona un archivo CSV.');
+    return;
+  }
+  setIsProcessing(true);
 
-        if (error) {
-          console.error("Error al invocar la función:", error);
-          alert(`Error al importar: ${error.message}`);
-        } else {
-          console.log("Respuesta de la función:", data);
-          alert(data.message || 'Importación completada.');
-          window.location.reload(); // Recargamos la página para ver los nuevos contactos
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: async (results) => {
+      const contactsToImport = results.data;
+      
+      const { data, error } = await supabase.functions.invoke('import-contacts', {
+        body: { contacts: contactsToImport },
+      });
+
+      // --- INICIO DE LA LÓGICA DE ERRORES MEJORADA ---
+      if (error) {
+        // Intentamos leer el cuerpo del error para obtener nuestro mensaje personalizado
+        try {
+          const errorBody = await error.context.json();
+          alert(`Error desde el servidor: ${errorBody.error}`);
+        } catch {
+          // Si no podemos leer el cuerpo, mostramos el error genérico
+          alert(`Error de red: ${error.message}`);
         }
-        
-        setIsProcessing(false);
-        onClose();
-        // --- FIN DE LA LLAMADA A LA FUNCIÓN ---
-      },
-      error: (error) => {
-        setIsProcessing(false);
-        console.error("Error al procesar el CSV:", error);
-        alert("Hubo un error al leer el archivo CSV.");
+      } else {
+        // Si todo sale bien
+        alert(data.message || 'Importación completada.');
+        window.location.reload(); 
       }
-    });
-  };
+      // --- FIN DE LA LÓGICA DE ERRORES MEJORADA ---
+      
+      setIsProcessing(false);
+      onClose();
+    },
+    error: (err) => { // Corregido para usar 'err'
+      setIsProcessing(false);
+      console.error("Error al procesar el CSV:", err);
+      alert("Hubo un error al leer el archivo CSV en el navegador.");
+    }
+  });
+};
 
   if (!isOpen) return null;
 
