@@ -4,60 +4,66 @@
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { ArrowLeftEndOnRectangleIcon, ChartBarIcon, UserGroupIcon, HomeIcon } from '@heroicons/react/24/outline'
-import { BeakerIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftOnRectangleIcon, ChartBarIcon, UserGroupIcon, HomeIcon, BeakerIcon, Bars3Icon } from '@heroicons/react/24/outline'
 
-export default function Sidebar() {
+type Props = {
+  isOpen: boolean;
+  onToggle: () => void;
+};
+
+export default function Sidebar({ isOpen, onToggle }: Props) {
   const { user, supabase } = useAuth()
   const router = useRouter()
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
+    await supabase.auth.signOut();
+    router.push('/login');
   }
 
-  if (!user) {
-    return null
-  }
+  if (!user) return null
 
   return (
-    // Aplicamos el azul oscuro de tu paleta directamente
-    <aside className="flex flex-col w-64 h-screen px-4 py-8 bg-[#3c527a] text-white shadow-lg">
-      <Link href="/" className="text-3xl font-extrabold text-[#ff8080] mb-10 flex items-center justify-center">
-        K<span className="text-white">ali</span> M<span className="text-white">ailing</span>
-      </Link>
+    <aside className={`flex-shrink-0 bg-[#3c527a] text-white flex flex-col h-screen transition-all duration-300 ease-in-out ${isOpen ? 'w-64' : 'w-20'}`}>
       
-      {/* Enlaces de Navegación */}
-      <nav className="flex-grow space-y-2">
-        <Link href="/" className="flex items-center px-4 py-2 mt-5 text-gray-200 hover:bg-[#ff8080] hover:text-white rounded-lg transition-colors duration-200">
-          <HomeIcon className="w-6 h-6 mr-3" />
-          Dashboard
+      {/* --- INICIO DE LA CORRECCIÓN --- */}
+      <div className="flex items-center p-4 h-16 border-b border-gray-700">
+        <div className="flex-1 overflow-hidden">
+            <Link href="/" className={`text-xl font-bold whitespace-nowrap transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
+            Kali Mailing
+            </Link>
+        </div>
+        <button onClick={onToggle} className="p-2 rounded-md hover:bg-gray-700">
+          <Bars3Icon className="h-6 w-6 text-white" />
+        </button>
+      </div>
+      {/* --- FIN DE LA CORRECCIÓN --- */}
+
+      <nav className="flex-grow p-4 space-y-2">
+        <Link href="/" title="Dashboard" className="flex items-center p-2 text-gray-300 hover:bg-[#ff8080] rounded-md">
+          <HomeIcon className="h-6 w-6 flex-shrink-0" />
+          <span className={`ml-4 whitespace-nowrap transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>Dashboard</span>
         </Link>
-        <Link href="/contacts" className="flex items-center px-4 py-2 text-gray-200 hover:bg-[#ff8080] hover:text-white rounded-lg transition-colors duration-200">
-          <UserGroupIcon className="w-6 h-6 mr-3" />
-          Contactos
+        <Link href="/contacts" title="Contactos" className="flex items-center p-2 text-gray-300 hover:bg-[#ff8080] rounded-md">
+          <UserGroupIcon className="h-6 w-6 flex-shrink-0" />
+          <span className={`ml-4 whitespace-nowrap transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>Contactos</span>
         </Link>
-        <Link href="/segments" className="flex items-center px-4 py-2 text-gray-200 hover:bg-[#ff8080] hover:text-white rounded-lg transition-colors duration-200">
-  <BeakerIcon className="w-6 h-6 mr-3" />
-  Segmentos
-</Link>
-        <Link href="/campaigns" className="flex items-center px-4 py-2 text-gray-200 hover:bg-[#ff8080] hover:text-white rounded-lg transition-colors duration-200">
-          <ChartBarIcon className="w-6 h-6 mr-3" />
-          Campañas
+        <Link href="/segments" title="Segmentos" className="flex items-center p-2 text-gray-300 hover:bg-[#ff8080] rounded-md">
+          <BeakerIcon className="h-6 w-6 flex-shrink-0" />
+          <span className={`ml-4 whitespace-nowrap transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>Segmentos</span>
+        </Link>
+        <Link href="/campaigns" title="Campañas" className="flex items-center p-2 text-gray-300 hover:bg-[#ff8080] rounded-md">
+          <ChartBarIcon className="h-6 w-6 flex-shrink-0" />
+          <span className={`ml-4 whitespace-nowrap transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>Campañas</span>
         </Link>
       </nav>
 
-      {/* Sección del Usuario y Logout */}
-      <div className="border-t border-gray-700 pt-4 mt-4">
-        <div className="text-sm mb-4 text-gray-300">
-          <p className="font-semibold truncate">{user.email}</p>
+      <div className="p-4 border-t border-gray-700">
+        <div className={`text-sm mb-2 overflow-hidden ${isOpen ? 'opacity-100' : 'opacity-0 h-0'}`}>
+          <p className="font-medium truncate">{user.email}</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="flex items-center w-full px-4 py-2 text-sm font-medium text-gray-200 hover:bg-[#ff8080] hover:text-white rounded-lg transition-colors duration-200"
-        >
-          <ArrowLeftEndOnRectangleIcon className="w-6 h-6 mr-3" />
-          Cerrar Sesión
+        <button onClick={handleLogout} title="Cerrar Sesión" className="flex items-center w-full p-2 text-sm font-medium text-gray-300 hover:bg-[#ff8080] rounded-md">
+          <ArrowLeftOnRectangleIcon className="h-6 w-6 flex-shrink-0" />
+          <span className={`ml-4 whitespace-nowrap transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>Cerrar Sesión</span>
         </button>
       </div>
     </aside>

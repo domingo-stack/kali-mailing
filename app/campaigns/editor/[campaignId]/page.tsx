@@ -1,121 +1,149 @@
 // app/campaigns/editor/[campaignId]/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-// 1. IMPORTAMOS useParams
 import { useRouter, useParams } from 'next/navigation';
+import { Menu, Transition } from '@headlessui/react'; // <-- IMPORTAMOS DE HEADLESS UI
+import { ChevronDownIcon } from '@heroicons/react/20/solid';
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image'
+import CampaignSettingsPanel from '@/components/CampaignSettingsPanel';
 
-type Campaign = {
-  id: number;
-  name: string;
-  subject: string;
-  preheader: string;
-  html_content: string | null;
-};
+type Campaign = { id: number; name: string; subject: string; preheader: string; html_content: string | null; };
+type Segment = { id: number; name: string; };
+type CampaignDetails = { name: string; subject: string; preheader: string; };
 
-type Segment = {
-  id: number;
-  name: string;
-};
-
-const MenuBar = ({ editor }: { editor: any }) => {
-  // ... (El código de MenuBar no cambia)
+const MenuBar = ({ editor, onImageUploadClick, contactColumns }: { editor: any, onImageUploadClick: () => void, contactColumns: string[] }) => {
   if (!editor) return null;
+
   return (
-    <div className="flex items-center space-x-2 p-2 bg-gray-100 rounded-t-lg border-b border-gray-300">
-      <button onClick={() => editor.chain().focus().toggleBold().run()} className={editor.isActive('bold') ? 'bg-gray-300 p-2 rounded' : 'p-2 rounded hover:bg-gray-200'}><strong>B</strong></button>
-      <button onClick={() => editor.chain().focus().toggleItalic().run()} className={editor.isActive('italic') ? 'bg-gray-300 p-2 rounded' : 'p-2 rounded hover:bg-gray-200'}><em>I</em></button>
-      <button onClick={() => editor.chain().focus().toggleStrike().run()} className={editor.isActive('strike') ? 'bg-gray-300 p-2 rounded' : 'p-2 rounded hover:bg-gray-200'}><del>S</del></button>
-      <button onClick={() => editor.chain().focus().setParagraph().run()} className={editor.isActive('paragraph') ? 'bg-gray-300 p-1 rounded' : 'p-1 rounded hover:bg-gray-200'}>P</button>
+    <div className="flex items-center space-x-1 p-2 bg-gray-100 rounded-t-lg border-b border-gray-300">
+      {/* Botones de formato */}
+      <button onClick={() => editor.chain().focus().toggleBold().run()} className="p-2 rounded hover:bg-gray-200"><b>B</b></button>
+      <button onClick={() => editor.chain().focus().toggleItalic().run()} className="p-2 rounded hover:bg-gray-200"><i>I</i></button>
+      <button onClick={onImageUploadClick} className="p-2 rounded hover:bg-gray-200 font-medium text-sm">Imagen</button>
+      
+      {/* Menú de Variables */}
+      <Menu as="div" className="relative inline-block text-left">
+        <div>
+          <Menu.Button className="inline-flex w-full justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Variables
+            <ChevronDownIcon className="ml-2 -mr-1 h-5 w-5 text-gray-400" />
+          </Menu.Button>
+        </div>
+        <Transition
+          as={Fragment}
+          enter="transition ease-out duration-100"
+          enterFrom="transform opacity-0 scale-95"
+          enterTo="transform opacity-100 scale-100"
+          leave="transition ease-in duration-75"
+          leaveFrom="transform opacity-100 scale-100"
+          leaveTo="transform opacity-0 scale-95"
+        >
+          <Menu.Items className="absolute left-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+            <div className="px-1 py-1 ">
+              {contactColumns.map(column => (
+                <Menu.Item key={column}>
+                  {({ active }) => (
+                    <button
+                      onClick={() => editor.chain().focus().insertContent(`{{${column}}}`).run()}
+                      className={`${active ? 'bg-[#ff8080] text-white' : 'text-gray-900'} group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                    >
+                      {column}
+                    </button>
+                  )}
+                </Menu.Item>
+              ))}
+            </div>
+          </Menu.Items>
+        </Transition>
+      </Menu>
     </div>
   );
 };
 
-// 2. YA NO RECIBIMOS 'params' COMO ARGUMENTO
-export default function CampaignEditorPage() { 
-  const { supabase } = useAuth();
+export default function CampaignEditorPage() {
+  const { supabase, user } = useAuth();
   const router = useRouter();
-  const params = useParams(); // 3. USAMOS EL HOOK useParams
-  const campaignId = params.campaignId as string; // Obtenemos el ID desde aquí
+  const params = useParams();
+  const campaignId = params.campaignId as string;
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [editDetails, setEditDetails] = useState<CampaignDetails>({ name: '', subject: '', preheader: '' });
   const [selectedSegment, setSelectedSegment] = useState<string>('');
-  const [testEmail, setTestEmail] = useState('');
+  const [testEmail, setTestEmail] = useState(user?.email || '');
+  
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const contactColumns = ['email', 'first_name', 'last_name', 'city', 'country', 'status'];
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit, Image],
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose max-w-none p-4 h-96 overflow-y-auto border border-gray-300 rounded-b-lg focus:outline-none',
+        class: 'prose max-w-none p-4 min-h-[400px] overflow-y-auto border-x border-b border-gray-300 rounded-b-lg focus:outline-none bg-white',
       },
     },
-    // 4. AÑADIMOS LA SOLUCIÓN PARA EL ERROR DE TIPTAP
     immediatelyRender: false,
   });
 
-  // ... (El resto del código, useEffects y handlers, no cambia)
   useEffect(() => {
     const fetchData = async () => {
-      const [campaignRes, segmentsRes] = await Promise.all([
-        supabase.from('campaigns').select('*').eq('id', campaignId).single(),
-        supabase.from('segments').select('id, name')
-      ]);
+      if (!supabase || !campaignId) return;
+      setIsLoading(true);
 
-      const { data: campaignData, error: campaignError } = campaignRes;
-      const { data: segmentsData, error: segmentsError } = segmentsRes;
-
+      const { data: campaignData, error: campaignError } = await supabase.from('campaigns').select('*').eq('id', campaignId).single();
       if (campaignError) {
-        console.error('Error fetching campaign:', campaignError);
-        alert('No se pudo cargar la campaña.');
         router.push('/campaigns');
         return;
       }
-      if (segmentsError) {
-        console.error('Error fetching segments:', segmentsError);
-      }
       
       setCampaign(campaignData);
+      setEditDetails({ name: campaignData.name, subject: campaignData.subject, preheader: campaignData.preheader });
+      editor?.commands.setContent(campaignData.html_content || '');
+      
+      const { data: segmentsData } = await supabase.from('segments').select('id, name');
       setSegments(segmentsData || []);
-      if (campaignData.html_content) {
-        editor?.commands.setContent(campaignData.html_content);
-      }
+      
       setIsLoading(false);
     };
+    fetchData();
+  }, [supabase, campaignId, editor, router]);
 
-    if (supabase && campaignId && editor) { // Aseguramos que el editor esté listo
-      fetchData();
-    }
-  }, [supabase, campaignId, router, editor]);
-
-  const handleSaveContent = async () => {
+  const handleSaveChanges = async () => {
     if (!editor || !campaign) return;
     setIsSaving(true);
+    
     const html = editor.getHTML();
-    const { error } = await supabase.from('campaigns').update({ html_content: html }).eq('id', campaign.id);
-    if (error) {
-      alert('Error al guardar el contenido.');
-    } else {
-      alert('Contenido guardado con éxito.');
-    }
+    
+    const { error } = await supabase
+      .from('campaigns')
+      .update({
+        name: editDetails.name,
+        subject: editDetails.subject,
+        preheader: editDetails.preheader,
+        html_content: html 
+      })
+      .eq('id', campaign.id);
+
+    if (error) alert('Error al guardar los cambios.');
+    else alert('Cambios guardados con éxito.');
+    
     setIsSaving(false);
   };
   
-  const handleSendTest = () => {
-    if (!testEmail) {
-      alert('Por favor, ingresa un email de prueba.');
-      return;
-    }
-    console.log(`Enviando prueba a: ${testEmail}`);
-    alert(`Correo de prueba enviado a ${testEmail} (simulación).`);
+  const handleDetailsChange = (field: keyof CampaignDetails, value: string) => {
+    setEditDetails(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSendCampaign = () => {
@@ -134,51 +162,73 @@ export default function CampaignEditorPage() {
     return <p>Cargando editor...</p>;
   }
 
-  // El JSX para renderizar no cambia
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || !supabase || !editor) return;
+
+    const file = event.target.files[0];
+    const fileName = `${Date.now()}_${file.name}`;
+    const bucket = 'campaign_images';
+
+    // Subimos el archivo a Supabase Storage
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, file);
+
+    if (error) {
+      alert('Error al subir la imagen.');
+      console.error(error);
+      return;
+    }
+     // Obtenemos la URL pública de la imagen que acabamos de subir
+     const { data } = supabase.storage
+     .from(bucket)
+     .getPublicUrl(fileName);
+   
+   // Insertamos la imagen en el editor usando la URL pública
+   if (data.publicUrl) {
+     editor.chain().focus().setImage({ src: data.publicUrl }).run();
+   }
+ };
+
   return (
-    <div className="w-full space-y-8">
-      <div>
-        <Link href="/campaigns" className="text-gray-500 hover:text-gray-900">&larr; Volver a Campañas</Link>
-        <h1 className="text-3xl font-bold text-[#383838] mt-2">Editando: {campaign?.name}</h1>
-      </div>
+    <div className="flex h-screen overflow-hidden bg-gray-50">
+      <CampaignSettingsPanel
+        details={editDetails}
+        onDetailsChange={handleDetailsChange}
+        segments={segments}
+        selectedSegment={selectedSegment}
+        onSegmentChange={setSelectedSegment}
+        testEmail={testEmail}
+        onTestEmailChange={setTestEmail}
+        onSendTest={() => {}}
+        onSendCampaign={() => {}}
+        isSending={false}
+      />
 
-      <div className="bg-white rounded-lg shadow-md p-8">
-        <p className="text-lg font-semibold text-[#383838]">Paso 2: Diseña el contenido</p>
-        <div className="mt-4">
-          <MenuBar editor={editor} />
-          <EditorContent editor={editor} />
-        </div>
-        <div className="flex justify-end pt-4 mt-4 border-t">
-          <button onClick={handleSaveContent} disabled={isSaving} className="bg-[#3c527a] text-white font-bold py-2 px-6 rounded-lg hover:opacity-90 disabled:opacity-50">
-            {isSaving ? 'Guardando...' : 'Guardar Contenido'}
+      <main className="flex-1 flex flex-col p-6 overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold text-[#383838]">Editando: {editDetails.name}</h1>
+          <button 
+            onClick={handleSaveChanges} 
+            disabled={isSaving} 
+            className="bg-[#3c527a] text-white font-bold py-2 px-6 rounded-lg hover:opacity-90 disabled:opacity-50"
+          >
+            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
           </button>
         </div>
-      </div>
 
-      <div className="bg-white rounded-lg shadow-md p-8">
-        <p className="text-lg font-semibold text-[#383838]">Paso 3: Envío y Prueba</p>
-        <div className="mt-4">
-          <label htmlFor="segment" className="block text-sm font-medium text-gray-700 mb-1">Destinatarios</label>
-          <select id="segment" value={selectedSegment} onChange={(e) => setSelectedSegment(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
-            <option value="" disabled>Selecciona un segmento...</option>
-            {segments.map(segment => (
-              <option key={segment.id} value={segment.id}>{segment.name}</option>
-            ))}
-          </select>
+        <div className="bg-white rounded-lg shadow-sm flex-grow flex flex-col">
+        <MenuBar editor={editor} onImageUploadClick={() => fileInputRef.current?.click()} contactColumns={contactColumns} />
+          <EditorContent editor={editor} className="flex-grow"/>
         </div>
-        <div className="mt-6 border-t pt-6">
-          <label htmlFor="test-email" className="block text-sm font-medium text-gray-700 mb-1">Enviar un correo de prueba</label>
-          <div className="flex space-x-2">
-            <input type="email" id="test-email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} placeholder="tu@email.com" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm" />
-            <button onClick={handleSendTest} className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700">Enviar Prueba</button>
-          </div>
-        </div>
-        <div className="flex justify-end pt-6 mt-6 border-t">
-          <button onClick={handleSendCampaign} className="bg-[#ff8080] text-white font-bold py-3 px-8 text-lg rounded-lg hover:opacity-90">
-            Revisar y Enviar Campaña
-          </button>
-        </div>
-      </div>
+        <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              className="hidden"
+              accept="image/png, image/jpeg, image/gif"
+            />
+      </main>
     </div>
   );
 }
