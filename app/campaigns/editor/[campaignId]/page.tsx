@@ -1,70 +1,26 @@
-// app/campaigns/editor/[campaignId]/page.tsx
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useParams } from 'next/navigation';
-import { Menu, Transition } from '@headlessui/react'; // <-- IMPORTAMOS DE HEADLESS UI
-import { ChevronDownIcon } from '@heroicons/react/20/solid';
+import CampaignSettingsPanel from '../../../../components/CampaignSettingsPanel';
+import MyEmailEditor from '../../../../components/MyEmailEditor';
+import { EditorRef } from 'react-email-editor';
 
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image'
-import CampaignSettingsPanel from '@/components/CampaignSettingsPanel';
-
-type Campaign = { id: number; name: string; subject: string; preheader: string; html_content: string | null; };
-type Segment = { id: number; name: string; };
-type CampaignDetails = { name: string; subject: string; preheader: string; };
-
-const MenuBar = ({ editor, onImageUploadClick, contactColumns }: { editor: any, onImageUploadClick: () => void, contactColumns: string[] }) => {
-  if (!editor) return null;
-
-  return (
-    <div className="flex items-center space-x-1 p-2 bg-gray-100 rounded-t-lg border-b border-gray-300">
-      {/* Botones de formato */}
-      <button onClick={() => editor.chain().focus().toggleBold().run()} className="p-2 rounded hover:bg-gray-200"><b>B</b></button>
-      <button onClick={() => editor.chain().focus().toggleItalic().run()} className="p-2 rounded hover:bg-gray-200"><i>I</i></button>
-      <button onClick={onImageUploadClick} className="p-2 rounded hover:bg-gray-200 font-medium text-sm">Imagen</button>
-      
-      {/* Menú de Variables */}
-      <Menu as="div" className="relative inline-block text-left">
-        <div>
-          <Menu.Button className="inline-flex w-full justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            Variables
-            <ChevronDownIcon className="ml-2 -mr-1 h-5 w-5 text-gray-400" />
-          </Menu.Button>
-        </div>
-        <Transition
-          as={Fragment}
-          enter="transition ease-out duration-100"
-          enterFrom="transform opacity-0 scale-95"
-          enterTo="transform opacity-100 scale-100"
-          leave="transition ease-in duration-75"
-          leaveFrom="transform opacity-100 scale-100"
-          leaveTo="transform opacity-0 scale-95"
-        >
-          <Menu.Items className="absolute left-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
-            <div className="px-1 py-1 ">
-              {contactColumns.map(column => (
-                <Menu.Item key={column}>
-                  {({ active }) => (
-                    <button
-                      onClick={() => editor.chain().focus().insertContent(`{{${column}}}`).run()}
-                      className={`${active ? 'bg-[#ff8080] text-white' : 'text-gray-900'} group flex w-full items-center rounded-md px-2 py-2 text-sm`}
-                    >
-                      {column}
-                    </button>
-                  )}
-                </Menu.Item>
-              ))}
-            </div>
-          </Menu.Items>
-        </Transition>
-      </Menu>
-    </div>
-  );
+type Campaign = { 
+  id: number; 
+  name: string; 
+  subject: string; 
+  preheader: string;
+  sender_name: string | null;
+  sender_email: string | null;
+  html_content: string | null;
+  json_content: object | null;
 };
+
+type Sender = { id: number; name: string; email: string; };
+type Segment = { id: number; name: string; };
+type CampaignDetails = { name: string; subject: string; preheader: string; sender_name: string; sender_email: string; };
 
 export default function CampaignEditorPage() {
   const { supabase, user } = useAuth();
@@ -75,123 +31,137 @@ export default function CampaignEditorPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [editDetails, setEditDetails] = useState<CampaignDetails>({ name: '', subject: '', preheader: '' });
+  const [editDetails, setEditDetails] = useState<CampaignDetails>({ name: '', subject: '', preheader: '', sender_name: '', sender_email: '' });
   const [selectedSegment, setSelectedSegment] = useState<string>('');
   const [testEmail, setTestEmail] = useState(user?.email || '');
   
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const contactColumns = ['email', 'first_name', 'last_name', 'city', 'country', 'status'];
-
-  const editor = useEditor({
-    extensions: [StarterKit, Image],
-    content: '',
-    editorProps: {
-      attributes: {
-        class: 'prose max-w-none p-4 min-h-[400px] overflow-y-auto border-x border-b border-gray-300 rounded-b-lg focus:outline-none bg-white',
-      },
-    },
-    immediatelyRender: false,
-  });
+  const [saveStatus, setSaveStatus] = useState<'Guardado' | 'Guardando...' | 'Sin guardar'>('Guardado');
+  const unlayerEditorRef = useRef<EditorRef>(null);
+  const [editorChangeCounter, setEditorChangeCounter] = useState(0);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  
+  const [isSendingCampaign, setIsSendingCampaign] = useState(false);
+  const [campaignError, setCampaignError] = useState<string | null>(null);
+  const [campaignSuccess, setCampaignSuccess] = useState<string | null>(null);
+  const [senders, setSenders] = useState<Sender[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!supabase || !campaignId) return;
       setIsLoading(true);
-
-      const { data: campaignData, error: campaignError } = await supabase.from('campaigns').select('*').eq('id', campaignId).single();
-      if (campaignError) {
+      const { data: campaignData } = await supabase.from('campaigns').select('*').eq('id', campaignId).single();
+      if (campaignData) {
+        setCampaign(campaignData);
+        setEditDetails({ 
+          name: campaignData.name, 
+          subject: campaignData.subject, 
+          preheader: campaignData.preheader,
+          sender_name: campaignData.sender_name || '',
+          sender_email: campaignData.sender_email || ''
+        });
+      } else {
         router.push('/campaigns');
         return;
       }
-      
-      setCampaign(campaignData);
-      setEditDetails({ name: campaignData.name, subject: campaignData.subject, preheader: campaignData.preheader });
-      editor?.commands.setContent(campaignData.html_content || '');
-      
       const { data: segmentsData } = await supabase.from('segments').select('id, name');
       setSegments(segmentsData || []);
-      
+      const { data: sendersData } = await supabase.from('verified_senders').select('*');
+setSenders(sendersData || []);
       setIsLoading(false);
     };
     fetchData();
-  }, [supabase, campaignId, editor, router]);
+  }, [supabase, campaignId, router]);
 
-  const handleSaveChanges = async () => {
-    if (!editor || !campaign) return;
-    setIsSaving(true);
-    
-    const html = editor.getHTML();
-    
-    const { error } = await supabase
-      .from('campaigns')
-      .update({
-        name: editDetails.name,
-        subject: editDetails.subject,
-        preheader: editDetails.preheader,
-        html_content: html 
-      })
-      .eq('id', campaign.id);
+  const handleSaveChanges = useCallback(async () => {
+    if (!unlayerEditorRef.current?.editor || !campaign) return;
+    setSaveStatus('Guardando...');
+    const data = await new Promise<{ design: object; html: string }>((resolve, reject) => {
+      if (unlayerEditorRef.current?.editor) {
+        unlayerEditorRef.current.editor.exportHtml(data => resolve(data));
+      } else {
+        reject(new Error("Editor no disponible."));
+      }
+    });
+    const { error } = await supabase.from('campaigns').update({
+      name: editDetails.name,
+      subject: editDetails.subject,
+      preheader: editDetails.preheader,
+      sender_name: editDetails.sender_name,
+      sender_email: editDetails.sender_email,
+      html_content: data.html,
+      json_content: data.design,
+      status: 'draft',
+      segment_id: selectedSegment ? parseInt(selectedSegment, 10) : null,
+    }).eq('id', campaign.id);
+    setSaveStatus(error ? 'Sin guardar' : 'Guardado');
+  }, [supabase, campaign, editDetails]);
 
-    if (error) alert('Error al guardar los cambios.');
-    else alert('Cambios guardados con éxito.');
-    
-    setIsSaving(false);
-  };
+  useEffect(() => {
+    if (saveStatus === 'Guardado') return;
+    const timer = setTimeout(() => handleSaveChanges(), 2000);
+    return () => clearTimeout(timer);
+  }, [editDetails, editorChangeCounter, handleSaveChanges, saveStatus, selectedSegment]);
+  
+  useEffect(() => {
+    if (isLoading === false) setSaveStatus('Sin guardar');
+  }, [editDetails, editorChangeCounter, isLoading]);
   
   const handleDetailsChange = (field: keyof CampaignDetails, value: string) => {
     setEditDetails(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSendCampaign = () => {
-    if (!selectedSegment) {
-      alert('Por favor, selecciona un segmento de destinatarios.');
+  const handleSendTest = async () => {
+    if (!unlayerEditorRef.current?.editor || !testEmail || !supabase) return;
+    setIsSendingTest(true);
+    try {
+      const data = await new Promise<{ design: object; html: string }>((resolve) => {
+        unlayerEditorRef.current!.editor!.exportHtml(data => resolve(data));
+      });
+      const { error } = await supabase.functions.invoke('send-test-email', {
+        body: { to_email: testEmail, subject: editDetails.subject, html_content: data.html, sender_name: editDetails.sender_name, sender_email: editDetails.sender_email },
+      });
+      if (error) throw error;
+      alert(`Correo de prueba enviado con éxito a ${testEmail}`);
+    } catch (error) {
+      alert(`Hubo un error al enviar el correo: ${(error as Error).message}`);
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+  
+  const handleSendCampaign = async () => {
+    if (saveStatus !== 'Guardado') {
+      alert('Por favor, espera a que se guarden todos los cambios antes de enviar la campaña.');
       return;
     }
-    console.log(`Enviando campaña a segmento ID: ${selectedSegment}`);
-    const confirmation = confirm('¿Estás seguro de que quieres enviar esta campaña a todos los contactos del segmento seleccionado?');
-    if (confirmation) {
-      alert('Enviando campaña... (simulación)');
+    const isConfirmed = window.confirm("Estás a punto de enviar esta campaña. ¿Estás seguro?");
+    if (!isConfirmed || !campaignId) return;
+
+    setIsSendingCampaign(true);
+    setCampaignError(null);
+    setCampaignSuccess(null);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('send-campaign', {
+        body: { campaign_id: campaignId },
+      });
+      if (invokeError) throw new Error(`Error de la Edge Function: ${invokeError.message}`);
+      setCampaignSuccess(data.message);
+      alert('¡Campaña enviada con éxito!');
+    } catch (e) {
+      const errorMessage = (e as Error).message;
+      console.error('Error al enviar la campaña:', errorMessage);
+      setCampaignError(errorMessage);
+    } finally {
+      setIsSendingCampaign(false);
     }
   };
 
   if (isLoading) {
-    return <p>Cargando editor...</p>;
+    return <div className="w-full text-center p-8">Cargando editor...</div>;
   }
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || !supabase || !editor) return;
-
-    const file = event.target.files[0];
-    const fileName = `${Date.now()}_${file.name}`;
-    const bucket = 'campaign_images';
-
-    // Subimos el archivo a Supabase Storage
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, file);
-
-    if (error) {
-      alert('Error al subir la imagen.');
-      console.error(error);
-      return;
-    }
-     // Obtenemos la URL pública de la imagen que acabamos de subir
-     const { data } = supabase.storage
-     .from(bucket)
-     .getPublicUrl(fileName);
-   
-   // Insertamos la imagen en el editor usando la URL pública
-   if (data.publicUrl) {
-     editor.chain().focus().setImage({ src: data.publicUrl }).run();
-   }
- };
-
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <CampaignSettingsPanel
         details={editDetails}
         onDetailsChange={handleDetailsChange}
@@ -200,34 +170,23 @@ export default function CampaignEditorPage() {
         onSegmentChange={setSelectedSegment}
         testEmail={testEmail}
         onTestEmailChange={setTestEmail}
-        onSendTest={() => {}}
-        onSendCampaign={() => {}}
-        isSending={false}
+        onSendTest={handleSendTest}
+        onSendCampaign={handleSendCampaign}
+        isSendingTest={isSendingTest}
+        saveStatus={saveStatus}
+        isSendingCampaign={isSendingCampaign}
+        campaignError={campaignError}
+        campaignSuccess={campaignSuccess}
+        senders={senders}
       />
-
-      <main className="flex-1 flex flex-col p-6 overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-[#383838]">Editando: {editDetails.name}</h1>
-          <button 
-            onClick={handleSaveChanges} 
-            disabled={isSaving} 
-            className="bg-[#3c527a] text-white font-bold py-2 px-6 rounded-lg hover:opacity-90 disabled:opacity-50"
-          >
-            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
-          </button>
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-grow">
+          <MyEmailEditor
+            ref={unlayerEditorRef} 
+            initialJson={campaign?.json_content}
+            onDesignUpdate={() => setEditorChangeCounter(c => c + 1)}
+          />
         </div>
-
-        <div className="bg-white rounded-lg shadow-sm flex-grow flex flex-col">
-        <MenuBar editor={editor} onImageUploadClick={() => fileInputRef.current?.click()} contactColumns={contactColumns} />
-          <EditorContent editor={editor} className="flex-grow"/>
-        </div>
-        <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageUpload}
-              className="hidden"
-              accept="image/png, image/jpeg, image/gif"
-            />
       </main>
     </div>
   );

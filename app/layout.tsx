@@ -41,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body className={`${nunito.className} bg-gray-100`}>
         <AuthProvider>
-          <div className="flex">
+        <div className="flex h-screen overflow-hidden">
             <Sidebar isOpen={isSidebarOpen} onToggle={() => setSidebarOpen(!isSidebarOpen)} />
             {/* El div 'wrapper' es el que se mueve */}
             <div className="flex-1 flex flex-col transition-all duration-300 ease-in-out">
