@@ -48,42 +48,31 @@ serve(async (req: Request) => {
     if (!campaign.segment_id) throw new Error('La campaña no tiene un segmento asociado.');
 
     // 2. Obtener las reglas del segmento.
-    const { data: segment, error: segmentError } = await supabaseAdmin
-      .from('segments')
-      .select('rules')
-      .eq('id', campaign.segment_id)
-      .single();
-
-    if (segmentError) throw new Error(`Error al buscar el segmento: ${segmentError.message}`);
+    const { data: contacts, error: contactsError } = await supabaseAdmin
+    .rpc('get_contacts_in_segment', { p_segment_id: campaign.segment_id });
     
-    // 3. Construir la consulta y obtener los contactos.
-    console.log('Buscando contactos del segmento con reglas:', segment.rules);
-    let contactsQuery = supabaseAdmin.from('contacts').select('id, email, first_name');
-    
-    const rule = segment.rules as { field: string; operator: string; value: string };
-    if (rule.operator === 'eq') {
-      contactsQuery = contactsQuery.eq(rule.field, rule.value);
-    }
-    // FUTURO: Aquí añadiremos 'else if' para más operadores (contains, gt, etc.)
-    // y un bucle si 'rules' se convierte en un array.
+  if (contactsError) throw new Error(`Error al buscar contactos: ${contactsError.message}`);
+  if (!contacts || contacts.length === 0) {
+    const errorMessage = 'No se encontraron contactos en este segmento. Por favor, ajusta las reglas o selecciona otro segmento.';
+    console.warn(errorMessage);
+    // Devolvemos un error 400 (Bad Request) que el frontend puede atrapar
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
 
-    const { data: contacts, error: contactsError } = await contactsQuery;
-    if (contactsError) throw new Error(`Error al buscar contactos: ${contactsError.message}`);
-    if (!contacts || contacts.length === 0) {
-      // Si no hay contactos, no es un error. Simplemente lo informamos.
-      console.log('No se encontraron contactos en el segmento. Finalizando.');
-      await supabaseAdmin.from('campaigns').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', campaign_id)
-      return new Response(JSON.stringify({ message: `Campaña finalizada. No se encontraron contactos en el segmento.` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
-      });
-    }
-
-    console.log(`Enviando campaña a ${contacts.length} contactos...`);
+  console.log(`Enviando campaña a ${contacts.length} contactos...`);
 
     // 4. Recorrer los contactos y enviar el correo a cada uno.
     for (const contact of contacts) {
       // BONUS: Personalización simple. Reemplaza {{first_name}} con el nombre del contacto.
-      const personalizedHtml = campaign.html_content?.replace(/{{first_name}}/g, contact.first_name || '');
+      const personalizedHtml = campaign.html_content
+  ?.replace(/{{first_name}}/g, contact.first_name || '')
+  .replace(/{{last_name}}/g, contact.last_name || '')
+  .replace(/{{email}}/g, contact.email || '')
+  .replace(/{{country}}/g, contact.country || '')
+  .replace(/{{city}}/g, contact.city || '');
       
       const command = new SendEmailCommand({
         FromEmailAddress: `"${campaign.sender_name}" <${campaign.sender_email}>`,

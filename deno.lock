@@ -51,6 +51,7 @@
         "npm:react-dom@19.1.0",
         "npm:react-email-editor@^1.7.11",
         "npm:react@19.1.0",
+        "npm:recharts@^3.2.1",
         "npm:supabase@^2.40.7",
         "npm:tailwindcss@4",
         "npm:typescript@5"

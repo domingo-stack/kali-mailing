@@ -33,9 +33,10 @@ export default function AddContactModal({ isOpen, onClose, onContactAdded }: Pro
       alert('El campo de email es obligatorio.');
       return;
     }
-
     setIsSaving(true);
 
+    // --- CORRECCIÓN AQUÍ ---
+    // Movemos 'subscription_type' fuera de 'attributes' y lo ponemos como una columna principal.
     const contactData = {
       email,
       first_name: firstName || null,
@@ -43,10 +44,8 @@ export default function AddContactModal({ isOpen, onClose, onContactAdded }: Pro
       city: city || null,
       country: country || null,
       status: contactStatus,
-      // Aquí construimos el objeto para el "bolsillo mágico"
-      attributes: {
-        subscription_type: subscriptionType
-      }
+      subscription_type: subscriptionType, // <-- AHORA ES UNA COLUMNA PRINCIPAL
+      attributes: {} // Dejamos attributes vacío por ahora, o podrías quitarlo si no añades otros
     };
 
     const { error } = await supabase.from('contacts').insert(contactData);

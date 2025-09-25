@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import CampaignSettingsPanel from '../../../../components/CampaignSettingsPanel';
 import MyEmailEditor from '../../../../components/MyEmailEditor';
 import { EditorRef } from 'react-email-editor';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 
 type Campaign = { 
   id: number; 
@@ -44,6 +45,7 @@ export default function CampaignEditorPage() {
   const [campaignError, setCampaignError] = useState<string | null>(null);
   const [campaignSuccess, setCampaignSuccess] = useState<string | null>(null);
   const [senders, setSenders] = useState<Sender[]>([]);
+  const [isPanelVisible, setIsPanelVisible] = useState(true); 
 
   useEffect(() => {
     const fetchData = async () => {
@@ -130,29 +132,45 @@ setSenders(sendersData || []);
   };
   
   const handleSendCampaign = async () => {
+    // El chequeo de 'Guardado' y la confirmación se quedan igual.
     if (saveStatus !== 'Guardado') {
       alert('Por favor, espera a que se guarden todos los cambios antes de enviar la campaña.');
       return;
     }
-    const isConfirmed = window.confirm("Estás a punto de enviar esta campaña. ¿Estás seguro?");
+    const isConfirmed = window.confirm(
+      "Estás a punto de enviar esta campaña a su segmento. ¿Estás seguro?"
+    );
     if (!isConfirmed || !campaignId) return;
-
+  
+    // Los estados de carga y error se quedan igual.
     setIsSendingCampaign(true);
     setCampaignError(null);
-    setCampaignSuccess(null);
+    setCampaignSuccess(null); // Lo quitamos de aquí, ya no es necesario
+  
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('send-campaign', {
         body: { campaign_id: campaignId },
       });
-      if (invokeError) throw new Error(`Error de la Edge Function: ${invokeError.message}`);
-      setCampaignSuccess(data.message);
-      alert('¡Campaña enviada con éxito!');
+  
+      if (invokeError) {
+        throw new Error(`Error de la Edge Function: ${invokeError.message}`);
+      }
+      
+      // --- ¡AQUÍ ESTÁ LA MAGIA! ---
+  
+      // CAMBIO 1: El pop-up ahora muestra el resumen que viene del backend.
+      alert(data.message); 
+  
+      // CAMBIO 2: Redirigimos al usuario a la página de estadísticas.
+      router.push(`/campaigns/stats/${campaignId}`);
+  
     } catch (e) {
       const errorMessage = (e as Error).message;
       console.error('Error al enviar la campaña:', errorMessage);
       setCampaignError(errorMessage);
     } finally {
-      setIsSendingCampaign(false);
+      // Esto se ejecutará, pero el usuario ya estará en proceso de redirección.
+      setIsSendingCampaign(false); 
     }
   };
 
@@ -160,25 +178,54 @@ setSenders(sendersData || []);
     return <div className="w-full text-center p-8">Cargando editor...</div>;
   }
 
+  const togglePanel = () => {
+    setIsPanelVisible(!isPanelVisible);
+  };
+
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <CampaignSettingsPanel
-        details={editDetails}
-        onDetailsChange={handleDetailsChange}
-        segments={segments}
-        selectedSegment={selectedSegment}
-        onSegmentChange={setSelectedSegment}
-        testEmail={testEmail}
-        onTestEmailChange={setTestEmail}
-        onSendTest={handleSendTest}
-        onSendCampaign={handleSendCampaign}
-        isSendingTest={isSendingTest}
-        saveStatus={saveStatus}
-        isSendingCampaign={isSendingCampaign}
-        campaignError={campaignError}
-        campaignSuccess={campaignSuccess}
-        senders={senders}
-      />
+    // Contenedor principal con una posición relativa para el botón
+    <div className="relative flex h-screen bg-gray-50 overflow-hidden">
+      
+      {/* --- El botón ahora vive aquí, fuera del panel --- */}
+      <button 
+        onClick={togglePanel}
+        className="absolute top-5 left-2 z-20 bg-white border border-gray-300 rounded-full p-1 text-gray-600 hover:bg-gray-100"
+        title={isPanelVisible ? "Ocultar panel" : "Mostrar panel"}
+        // Lo movemos junto con el panel
+        style={{ transform: isPanelVisible ? 'translateX(24rem)' : 'translateX(0)', transition: 'transform 300ms ease-in-out' }}
+      >
+        {isPanelVisible 
+          ? <ChevronLeftIcon className="h-5 w-5" /> 
+          : <ChevronRightIcon className="h-5 w-5" />
+        }
+      </button>
+
+      {/* --- Panel lateral con clases de transición --- */}
+      <aside 
+        className="flex-shrink-0 bg-white border-r border-gray-200 transition-all duration-300 ease-in-out"
+        style={{ width: isPanelVisible ? '24rem' : '0', overflow: 'hidden' }}
+      >
+        <CampaignSettingsPanel
+          details={editDetails}
+          onDetailsChange={handleDetailsChange}
+          segments={segments}
+          selectedSegment={selectedSegment}
+          isPanelVisible={isPanelVisible}
+          onTogglePanel={togglePanel}
+          onSegmentChange={setSelectedSegment}
+          senders={senders}
+          testEmail={testEmail}
+          onTestEmailChange={setTestEmail}
+          onSendTest={handleSendTest}
+          onSendCampaign={handleSendCampaign}
+          isSendingTest={isSendingTest}
+          saveStatus={saveStatus}
+          isSendingCampaign={isSendingCampaign}
+          campaignError={campaignError}
+          campaignSuccess={campaignSuccess}
+        />
+      </aside>
+
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-grow">
           <MyEmailEditor

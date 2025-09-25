@@ -5,7 +5,7 @@ import { useState, ChangeEvent } from 'react';
 import Papa from 'papaparse';
 import { useAuth } from '@/context/AuthContext'; // <-- 1. IMPORTAMOS useAuth
 
-export default function ImportContactsModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+export default function ImportContactsModal({ isOpen, onClose, onImportSuccess }: { isOpen: boolean, onClose: () => void, onImportSuccess: () => void }) {
   const { supabase } = useAuth(); // <-- 2. OBTENEMOS EL CLIENTE DE SUPABASE
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -27,41 +27,28 @@ const handleImport = async () => { // Asegúrate de que la función sea async
     header: true,
     skipEmptyLines: true,
     complete: async (results) => {
+      console.log('Datos leídos del CSV por el navegador:', results.data);
       const contactsToImport = results.data;
       
       const { data, error } = await supabase.functions.invoke('import-contacts', {
         body: { contacts: contactsToImport },
       });
 
-      // --- INICIO DE LA LÓGICA DE ERRORES MEJORADA ---
       if (error) {
-        // Intentamos leer el cuerpo del error para obtener nuestro mensaje personalizado
-        try {
-          const errorBody = await error.context.json();
-          alert(`Error desde el servidor: ${errorBody.error}`);
-        } catch {
-          // Si no podemos leer el cuerpo, mostramos el error genérico
-          alert(`Error de red: ${error.message}`);
-        }
+        // ... (tu manejo de errores está bien)
       } else {
-        // Si todo sale bien
         alert(data.message || 'Importación completada.');
-        window.location.reload(); 
+        onImportSuccess(); // <-- LLAMAMOS AL CALLBACK PARA REFRESCAR
       }
-      // --- FIN DE LA LÓGICA DE ERRORES MEJORADA ---
       
       setIsProcessing(false);
       onClose();
     },
-    error: (err) => { // Corregido para usar 'err'
-      setIsProcessing(false);
-      console.error("Error al procesar el CSV:", err);
-      alert("Hubo un error al leer el archivo CSV en el navegador.");
-    }
+    error: (err) => { /* ... */ }
   });
 };
 
-  if (!isOpen) return null;
+if (!isOpen) return null;
 
   return (
     // ... (El JSX del modal se queda exactamente igual que antes)

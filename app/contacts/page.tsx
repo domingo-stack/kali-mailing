@@ -51,59 +51,73 @@ export default function ContactsPage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="flex justify-between items-center mb-8">
-        {/* ... (el código de los botones se queda igual) ... */}
-        <h1 className="text-3xl font-bold text-[#383838]">Contactos</h1>
-        <div className="flex space-x-4">
-          <button onClick={() => setIsAddModalOpen(true)} className="bg-[#3c527a] text-white font-bold py-2 px-4 rounded-lg hover:opacity-90">
-            Añadir Contacto
-          </button>
-          <button onClick={() => setIsImportModalOpen(true)} className="bg-[#ff8080] text-white font-bold py-2 px-4 rounded-lg hover:opacity-90">
-            Importar (CSV)
-          </button>
+    <div className="w-full flex flex-col h-full bg-gray-50 p-4 sm:p-6 lg:p-8">
+      {/* --- Cabecera Fija --- */}
+      <header className="flex-shrink-0">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Contactos</h1>
+          <div className="flex space-x-4">
+            <button onClick={() => setIsAddModalOpen(true)} className="bg-[#3c527a] text-white font-bold py-2 px-4 rounded-lg hover:opacity-90">
+              Añadir Contacto
+            </button>
+            <button onClick={() => setIsImportModalOpen(true)} className="bg-[#ff8080] text-white font-bold py-2 px-4 rounded-lg hover:opacity-90">
+              Importar (CSV)
+            </button>
+          </div>
         </div>
-      </div>
-      
-      {isLoading ? (
-        <p className="text-gray-500">Cargando contactos...</p>
-      ) : (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <table className="min-w-full">
-            <thead className="bg-gray-50">
-                {/* ... (el thead se queda igual) ... */}
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Creación</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {contacts.map((contact) => (
-                // 4. AÑADIMOS onClick Y ESTILOS AL <tr>
-                <tr 
-                  key={contact.id} 
-                  className="hover:bg-gray-100 cursor-pointer"
-                  onClick={() => handleRowClick(contact.id)}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{contact.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contact.first_name} {contact.last_name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contact.status}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(contact.created_at).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {/* ... (el código de 'No se encontraron contactos' se queda igual) ... */}
-        </div>
-      )}
+      </header>
 
-      {/* ... (el código de los modales se queda igual) ... */}
-       <ImportContactsModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
-       <AddContactModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onContactAdded={fetchContacts} />
+      {/* --- Contenido con Scroll --- */}
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="text-center py-12 text-gray-500">Cargando contactos...</div>
+        ) : contacts.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center text-gray-500">
+             <h3 className="text-lg font-medium">No tienes contactos</h3>
+             <p className="mt-1 text-sm">¡Añade tu primer contacto o importa una lista para empezar!</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Creación</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {contacts.map((contact) => (
+                  <tr 
+                    key={contact.id} 
+                    className="hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleRowClick(contact.id)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{contact.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contact.first_name} {contact.last_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{contact.status}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(contact.created_at).toLocaleDateString('es-ES')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Los modales se quedan fuera de la zona de scroll */}
+      <ImportContactsModal 
+        isOpen={isImportModalOpen} 
+        onClose={() => setIsImportModalOpen(false)} 
+        onImportSuccess={fetchContacts} // <-- Pasamos la función para refrescar la lista
+      />
+      <AddContactModal 
+        isOpen={isAddModalOpen} 
+        onClose={() => setIsAddModalOpen(false)} 
+        onContactAdded={fetchContacts} 
+      />
     </div>
-  );
-}
+  );}

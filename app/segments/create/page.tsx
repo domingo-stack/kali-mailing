@@ -1,202 +1,109 @@
-// app/segments/create/page.tsx
+// En: app/segments/create/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { PlusCircleIcon } from '@heroicons/react/24/outline';
+
+// --- CORRECCIÓN: Importamos desde los lugares correctos ---
+import SegmentRuleBuilder from '@/components/SegmentRuleBuilder';
+import { 
+  RulesStructure,
+  fieldConfig, 
+  FieldKey 
+} from '@/lib/segmentationConfig'; // <-- La fuente de la verdad para los tipos y la config
+
+// Definimos el estado inicial para un nuevo segmento
+const initialRulesState: RulesStructure = {
+  condition: 'AND',
+  groups: [
+    {
+      condition: 'AND',
+      rules: [{ field: 'country', operator: 'eq', value: '' }]
+    }
+  ]
+};
 
 export default function CreateSegmentPage() {
   const { supabase } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [segmentName, setSegmentName] = useState('');
-  const [ruleField, setRuleField] = useState('status');
-  const [ruleOperator, setRuleOperator] = useState('eq');
-  const [ruleValue, setRuleValue] = useState('');
+  const [rules, setRules] = useState<RulesStructure>(initialRulesState);
   const [isSaving, setIsSaving] = useState(false);
+  const [dynamicOptions, setDynamicOptions] = useState<Record<string, string[]>>({});
+
+  const activeDynamicFields = useMemo(() => {
+    const fields = new Set<string>();
+    rules.groups.forEach(group => {
+      group.rules.forEach(rule => {
+        if (fieldConfig[rule.field as FieldKey]?.type === 'select-dynamic') {
+          fields.add(rule.field);
+        }
+      });
+    });
+    return Array.from(fields);
+  }, [rules]);
 
   useEffect(() => {
-    const nameFromQuery = searchParams.get('name');
-    const rulesFromQuery = searchParams.get('rules');
-
-    if (nameFromQuery) {
-      setSegmentName(nameFromQuery);
-    }
-    if (rulesFromQuery) {
-      try {
-        const rules = JSON.parse(rulesFromQuery);
-        setRuleField(rules.field || 'status');
-        setRuleOperator(rules.operator || 'eq');
-        setRuleValue(rules.value || '');
-      } catch (error) {
-        console.error("Error al parsear las reglas desde la URL", error);
+    if (!supabase || activeDynamicFields.length === 0) return;
+    const fetchOptions = async () => {
+      const newOptions = { ...dynamicOptions };
+      let needsUpdate = false;
+      for (const field of activeDynamicFields) {
+        if (!newOptions[field]) {
+          const { data, error } = await supabase.rpc('get_distinct_contact_attributes', { column_name: field });
+          if (!error && data) {
+            newOptions[field] = data.map((item: { distinct_value: string }) => item.distinct_value);
+            needsUpdate = true;
+          }
+        }
       }
-    }
-  }, [searchParams]);
-
-  // Determina si el campo seleccionado es de tipo fecha
-  const isDateField = ruleField === 'created_at' || ruleField === 'last_modified_at';
+      if (needsUpdate) setDynamicOptions(newOptions);
+    };
+    fetchOptions();
+  }, [supabase, activeDynamicFields, dynamicOptions]);
 
   const handleSaveSegment = async () => {
-    if (!segmentName || !ruleValue) {
-      alert('Por favor, completa todos los campos de la regla.');
+    if (!segmentName) {
+      alert('Por favor, dale un nombre a tu segmento.');
       return;
     }
-    
     setIsSaving(true);
-
-    const segmentData = {
-      name: segmentName,
-      // Convertimos el valor a número si es necesario
-      rules: {
-        field: ruleField,
-        operator: ruleOperator,
-        value: (isDateField && ruleOperator === 'last_days') ? Number(ruleValue) : ruleValue
-      }
-    };
-
-    const { error } = await supabase
-      .from('segments')
-      .insert([segmentData]);
+    const { error } = await supabase.from('segments').insert([{ 
+      name: segmentName, 
+      rules: rules
+    }]);
 
     if (error) {
-      console.error('Error al guardar el segmento:', error);
       alert('Hubo un error al guardar el segmento.');
+      console.error(error);
       setIsSaving(false);
     } else {
       alert('¡Segmento guardado con éxito!');
       router.push('/segments');
     }
   };
-  
-  // Renderiza el input correcto dependiendo del operador
-  const renderValueInput = () => {
-    if (isDateField && ruleOperator === 'last_days') {
-      return (
-        <div className="flex items-center space-x-2">
-          <input
-            type="number"
-            value={ruleValue}
-            onChange={(e) => setRuleValue(e.target.value)}
-            placeholder="Ej: 30"
-            className="w-24 px-3 py-2 border border-gray-300 rounded-lg"
-          />
-          <span className="text-gray-700">días</span>
-        </div>
-      );
-    }
-    
-    if (isDateField && (ruleOperator === 'after' || ruleOperator === 'before')) {
-      return (
-        <input
-          type="date"
-          value={ruleValue}
-          onChange={(e) => setRuleValue(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-        />
-      );
-    }
-
-    return (
-      <input
-        type="text"
-        value={ruleValue}
-        onChange={(e) => setRuleValue(e.target.value)}
-        placeholder="Escribe un valor..."
-        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-      />
-    );
-  };
 
   return (
-    <div className="w-full">
+    <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
-        <Link href="/segments" className="text-gray-500 hover:text-gray-900">
-          &larr; Volver a Segmentos
-        </Link>
-        <h1 className="text-3xl font-bold text-[#383838] mt-2">
-          Crear Nuevo Segmento
-        </h1>
+        <Link href="/segments" className="text-sm text-gray-500 hover:text-gray-900">&larr; Volver a Segmentos</Link>
+        <h1 className="text-3xl font-bold text-gray-800 mt-2">Crear Nuevo Segmento</h1>
       </div>
-
-      <div className="bg-white rounded-lg shadow-md p-8">
-        {/* Nombre del Segmento */}
+      <div className="bg-white rounded-lg shadow-md p-6 sm:p-8">
         <div className="mb-6">
-          <label htmlFor="segmentName" className="block text-sm font-medium text-gray-700 mb-1">
-            Nombre del Segmento
-          </label>
-          <input
-            type="text"
-            id="segmentName"
-            value={segmentName}
-            onChange={(e) => setSegmentName(e.target.value)}
-            placeholder="Ej: Usuarios creados en los últimos 30 días"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-          />
+          <label htmlFor="segmentName" className="block text-sm font-medium text-gray-700 mb-1">Nombre del Segmento</label>
+          <input type="text" id="segmentName" value={segmentName} onChange={(e) => setSegmentName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ej: Clientes Premium de Perú" />
         </div>
-
-        {/* Constructor de Reglas */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">Reglas</h2>
-          <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-            {/* Campo a filtrar */}
-            <select 
-              value={ruleField}
-              onChange={(e) => {
-                setRuleField(e.target.value);
-                // Reseteamos el operador si cambiamos de tipo de campo
-                const isDate = e.target.value.includes('_at');
-                setRuleOperator(isDate ? 'last_days' : 'eq');
-                setRuleValue('');
-              }}
-              className="px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <optgroup label="Texto">
-                <option value="status">Estado</option>
-                <option value="country">País</option>
-                <option value="city">Ciudad</option>
-              </optgroup>
-              <optgroup label="Fecha">
-                <option value="created_at">Fecha de Creación</option>
-                <option value="last_modified_at">Última Actualización</option>
-              </optgroup>
-            </select>
-
-            {/* Operador de la regla */}
-            <select 
-              value={ruleOperator}
-              onChange={(e) => setRuleOperator(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              {isDateField ? (
-                <>
-                  <option value="last_days">en los últimos</option>
-                  <option value="after">después de</option>
-                  <option value="before">antes de</option>
-                </>
-              ) : (
-                <>
-                  <option value="eq">es igual a</option>
-                  <option value="neq">no es igual a</option>
-                  <option value="contains">contiene</option>
-                </>
-              )}
-            </select>
-
-            {/* Valor de la regla (ahora es dinámico) */}
-            {renderValueInput()}
-          </div>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Reglas</h2>
+          <SegmentRuleBuilder value={rules} onChange={setRules} dynamicOptions={dynamicOptions} />
         </div>
-
-        {/* Botón de Guardar */}
         <div className="flex justify-end mt-8">
-          <button
-            onClick={handleSaveSegment}
-            disabled={isSaving}
-            className="bg-[#3c527a] text-white font-bold py-2 px-6 rounded-lg hover:opacity-90 disabled:opacity-50"
-          >
+          <button onClick={handleSaveSegment} disabled={isSaving} className="bg-[#3c527a] text-white font-bold py-2 px-6 rounded-lg hover:opacity-90 disabled:opacity-50">
             {isSaving ? 'Guardando...' : 'Guardar Segmento'}
           </button>
         </div>

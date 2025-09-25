@@ -3,7 +3,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-console.log('Función `ses-webhook` v3 (con lógica de DB) iniciada.');
+console.log('Función `ses-webhook` v4 (a prueba de errores) iniciada.');
 
 serve(async (req: Request) => {
   try {
@@ -34,7 +34,6 @@ serve(async (req: Request) => {
         const mail = sesEvent.mail;
         const messageId = mail.messageId;
 
-        // --- CORRECCIÓN 1: Añadimos los tipos para 'name' y 'h' ---
         const findHeader = (name: string) => 
           mail.headers.find((h: { name: string; value: string }) => h.name === name)?.value;
         
@@ -45,41 +44,38 @@ serve(async (req: Request) => {
           console.warn('Evento recibido sin headers de campaña/contacto. Ignorando.');
           return new Response('Notificación ignorada (sin headers).', { status: 200 });
         }
+        
+        // --- LÓGICA DE INSERCIÓN MEJORADA ---
+        let error = null;
 
         if (eventType === 'Open') {
           const { ipAddress, userAgent } = sesEvent.open;
-          await supabaseAdmin.from('campaign_opens').insert({
-            campaign_id: parseInt(campaignId),
-            contact_id: parseInt(contactId),
-            message_id: messageId,
-            ip_address: ipAddress,
-            user_agent: userAgent
-          });
+          ({ error } = await supabaseAdmin.from('campaign_opens').insert({
+            campaign_id: parseInt(campaignId), contact_id: parseInt(contactId),
+            message_id: messageId, ip_address: ipAddress, user_agent: userAgent
+          }));
+          if (error) throw new Error(`Error al insertar apertura: ${error.message}`);
           console.log(`Apertura registrada para campaña ${campaignId}`);
         }
 
         if (eventType === 'Click') {
           const { ipAddress, userAgent, link } = sesEvent.click;
-          await supabaseAdmin.from('campaign_clicks').insert({
-            campaign_id: parseInt(campaignId),
-            contact_id: parseInt(contactId),
-            message_id: messageId,
-            link_url: link,
-            ip_address: ipAddress,
-            user_agent: userAgent
-          });
+          ({ error } = await supabaseAdmin.from('campaign_clicks').insert({
+            campaign_id: parseInt(campaignId), contact_id: parseInt(contactId),
+            message_id: messageId, link_url: link, ip_address: ipAddress, user_agent: userAgent
+          }));
+          if (error) throw new Error(`Error al insertar clic: ${error.message}`);
           console.log(`Clic registrado para campaña ${campaignId} en el enlace ${link}`);
         }
         
         if (eventType === 'Bounce') {
-            const { bounceType } = sesEvent.bounce;
-            await supabaseAdmin.from('campaign_bounces').insert({
-                campaign_id: parseInt(campaignId),
-                contact_id: parseInt(contactId),
-                message_id: messageId,
-                bounce_type: bounceType
-            });
-            console.log(`Rebote (${bounceType}) registrado para campaña ${campaignId}`);
+          const { bounceType } = sesEvent.bounce;
+          ({ error } = await supabaseAdmin.from('campaign_bounces').insert({
+            campaign_id: parseInt(campaignId), contact_id: parseInt(contactId),
+            message_id: messageId, bounce_type: bounceType
+          }));
+          if (error) throw new Error(`Error al insertar rebote: ${error.message}`);
+          console.log(`Rebote (${bounceType}) registrado para campaña ${campaignId}`);
         }
 
         return new Response('Notificación procesada y guardada.', { status: 200 });
@@ -90,7 +86,6 @@ serve(async (req: Request) => {
     }
   } catch (error) {
     console.error('Error fatal procesando el webhook de SES:', error);
-    // --- CORRECCIÓN 2: Añadimos el tipo a 'error' ---
     return new Response(`Error interno: ${(error as Error).message}`, { status: 500 });
   }
 });

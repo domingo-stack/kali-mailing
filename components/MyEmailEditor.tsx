@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-// ARREGLO: Importamos los tipos necesarios directamente desde la librería y su sub-ruta de tipos.
 import EmailEditor, { EditorRef, EmailEditorProps } from 'react-email-editor';
 import { Editor } from 'react-email-editor/dist/types';
 
@@ -15,17 +14,37 @@ type Props = {
   initialJson?: any | null;
 };
 
+const mergeTags = {
+  first_name: {
+    name: "Nombre",
+    value: "{{first_name}}"
+  },
+  last_name: {
+    name: "Apellido",
+    value: "{{last_name}}"
+  },
+  email: {
+    name: "Email",
+    value: "{{email}}"
+  },
+  country: {
+    name: "País",
+    value: "{{country}}"
+  },
+  city: {
+    name: "Ciudad",
+    value: "{{city}}"
+  }
+};
+
 // Here we make our MyEmailEditor component. 
 // It can use a special "ref" to talk to the editor, and it takes our Props.
 const MyEmailEditor = React.forwardRef<EditorRef, Props>(({ onDesignUpdate, initialJson }, ref) => {
-  // ARREGLO: Tipamos 'unlayer' correctamente para que TypeScript sepa qué es.
   const onReady: EmailEditorProps['onReady'] = (unlayer: Editor) => {
     // Carga el diseño guardado si existe.
     if (initialJson && Object.keys(initialJson).length > 0) {
       unlayer.loadDesign(initialJson);
     }
-    
-    // Escucha los cambios en el diseño para activar el autoguardado.
     if (onDesignUpdate) {
       unlayer.addEventListener('design:updated', onDesignUpdate);
     }
@@ -36,6 +55,9 @@ const MyEmailEditor = React.forwardRef<EditorRef, Props>(({ onDesignUpdate, init
       ref={ref}
       onReady={onReady}
       minHeight="100vh" // Ocupa toda la altura disponible
+      options={{
+        mergeTags,
+      }}
     />
   );
 });
