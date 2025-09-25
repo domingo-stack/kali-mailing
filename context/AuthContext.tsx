@@ -1,20 +1,24 @@
-// context/AuthContext.tsx
+// En: context/AuthContext.tsx
 'use client'
 
 import { createContext, useContext, useEffect, useState, useMemo } from 'react'
-// 1. IMPORTAMOS createClient y SupabaseClient AQUÍ
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import type { Session, User } from '@supabase/supabase-js'
+import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js'
 
-// 2. AÑADIMOS EL CLIENTE DE SUPABASE AL TIPO DEL CONTEXTO
+// --- 1. Definimos el tipo para el perfil del usuario ---
+type Profile = {
+  role: string;
+  // aquí podrías añadir más campos en el futuro, como 'full_name', 'avatar_url', etc.
+};
+
+// --- 2. Añadimos 'profile' al tipo del contexto ---
 type AuthContextType = { 
   session: Session | null; 
   user: User | null; 
+  profile: Profile | null; // <-- Nuevo
   isLoading: boolean;
-  supabase: SupabaseClient; // El cliente siempre estará disponible
+  supabase: SupabaseClient;
 };
 
-// Creamos el cliente de Supabase una sola vez fuera del componente
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -25,34 +29,57 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null); // <-- Nuevo estado
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // La comprobación de sesión inicial ahora también busca el perfil
     const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
+
+      // --- 3. Lógica para buscar el perfil ---
+      if (session?.user) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+        setProfile(profileData);
+      }
       setIsLoading(false);
     }
+    
     checkInitialSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      // Cuando la sesión cambia, el cliente de Supabase se actualiza automáticamente.
+    // El listener de cambios de sesión también actualiza el perfil
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+
+      if (session?.user) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+        setProfile(profileData);
+      } else {
+        setProfile(null); // Limpiamos el perfil al cerrar sesión
+      }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => { subscription.unsubscribe(); };
   }, []);
 
   const value = useMemo(() => ({
     session,
     user,
+    profile, // <-- Nuevo valor proveído
     isLoading,
-    supabase, // 3. PROVEEMOS EL CLIENTE A TRAVÉS DEL CONTEXTO
-  }), [session, user, isLoading]);
+    supabase,
+  }), [session, user, profile, isLoading]);
 
   return (
     <AuthContext.Provider value={value}>
