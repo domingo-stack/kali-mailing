@@ -5,7 +5,9 @@ const vercelUrl = 'https://kali-mailing-7gtwlsyei-domingos-projects-36185659.ver
 
 // 2. Creamos una lista de los "orígenes" (URLs) que tienen permiso
 const allowedOrigins = [
-  'http://localhost:3000', // Tu entorno de desarrollo
+  'http://localhost:3000',
+  'https://kali-mailing.califica.ai',
+   // Tu entorno de desarrollo
   vercelUrl,               // Tu entorno de producción
 ];
 
@@ -15,8 +17,7 @@ export const getCorsHeaders = (origin: string | null) => {
   const isAllowed = origin && allowedOrigins.includes(origin);
 
   return {
-    // Si el origen es permitido, lo devolvemos. Si no, no devolvemos nada para máxima seguridad.
-    'Access-Control-Allow-Origin': isAllowed ? origin : 'null',
+    'Access-Control-Allow-Origin': isAllowed ? origin : allowedOrigins[0], // Devuelve el origen si está permitido
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   };
 };
