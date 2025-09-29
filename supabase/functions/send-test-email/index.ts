@@ -1,7 +1,7 @@
 // En: supabase/functions/send-test-email/index.ts
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { corsHeaders } from '../_shared/cors.ts'
+import { getCorsHeaders } from '../_shared/cors.ts' 
 import { SESv2Client, SendEmailCommand } from 'npm:@aws-sdk/client-sesv2'
 import { FetchHttpHandler } from 'npm:@smithy/fetch-http-handler'
 
@@ -19,8 +19,9 @@ const sesClient = new SESv2Client({
 console.log("Cliente de SES v9 creado con éxito. ✅");
 
 serve(async (req: Request) => {
+  const requestOrigin = req.headers.get('Origin');
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: getCorsHeaders(requestOrigin) })
   }
 
   try {
@@ -47,13 +48,13 @@ serve(async (req: Request) => {
     console.log(`Correo enviado con éxito. Message ID: ${response.MessageId}`);
 
     return new Response(JSON.stringify({ message: `Correo enviado`, aws_message_id: response.MessageId }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...getCorsHeaders(requestOrigin), 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error) {
     console.error("Error al procesar la solicitud de envío:", error);
     return new Response(JSON.stringify({ error: (error as Error).message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...getCorsHeaders(requestOrigin), 'Content-Type': 'application/json' },
       status: 500,
     })
   }

@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
 export default function CreateCampaignPage() {
-  const { supabase } = useAuth();
+  const { supabase, user } = useAuth(); // <-- Asegúrate de obtener el 'user' del contexto
   const router = useRouter();
 
   const [campaignName, setCampaignName] = useState('');
@@ -20,6 +20,11 @@ export default function CreateCampaignPage() {
       alert('Por favor, completa el nombre y el asunto de la campaña.');
       return;
     }
+    // Verificamos que tengamos un usuario antes de continuar
+    if (!user) {
+        alert('No se pudo identificar al usuario. Por favor, inicia sesión de nuevo.');
+        return;
+    }
 
     setIsSaving(true);
 
@@ -27,22 +32,22 @@ export default function CreateCampaignPage() {
       name: campaignName,
       subject: subject,
       preheader: preheader,
-      status: 'draft' // Estado inicial de la campaña
+      status: 'draft',
+      user_id: user.id // <-- LA LÍNEA CLAVE QUE AÑADIMOS
     };
 
     const { data, error } = await supabase
       .from('campaigns')
       .insert(campaignData)
-      .select('id') // Le pedimos que nos devuelva el ID de la campaña recién creada
-      .single(); // Esperamos un solo resultado
+      .select('id')
+      .single();
 
     if (error) {
       console.error('Error al crear la campaña:', error);
-      alert('Hubo un error al crear la campaña.');
+      alert(`Hubo un error al crear la campaña: ${error.message}`);
       setIsSaving(false);
     } else {
-      alert('¡Campaña creada! Ahora vamos al editor.');
-      // Redirigimos al usuario al editor para esta campaña específica
+      // No necesitamos una alerta aquí, la redirección es suficiente feedback
       router.push(`/campaigns/editor/${data.id}`);
     }
   };

@@ -132,47 +132,58 @@ setSenders(sendersData || []);
   };
   
   const handleSendCampaign = async () => {
-    // El chequeo de 'Guardado' y la confirmación se quedan igual.
-    if (saveStatus !== 'Guardado') {
-      alert('Por favor, espera a que se guarden todos los cambios antes de enviar la campaña.');
+  if (saveStatus !== 'Guardado') {
+    alert('Por favor, espera a que se guarden los cambios.');
+    return;
+  }
+  if (!campaignId) return;
+
+  setIsSendingCampaign(true);
+  setCampaignError(null);
+
+  try {
+    // --- NUEVO PASO 1: Previsualización ---
+    const { data: preview, error: previewError } = await supabase.functions.invoke('get-campaign-preview', {
+      body: { campaign_id: campaignId }
+    });
+
+    if (previewError) throw new Error(`No se pudo previsualizar la campaña: ${previewError.message}`);
+    
+    // --- NUEVO PASO 2: Primera Confirmación (conteo) ---
+    const firstConfirmation = window.confirm(
+      `Esta campaña se enviará a ${preview.contactCount} contactos. ¿Quieres continuar?`
+    );
+    if (!firstConfirmation) {
+      setIsSendingCampaign(false);
       return;
     }
-    const isConfirmed = window.confirm(
-      "Estás a punto de enviar esta campaña a su segmento. ¿Estás seguro?"
+    
+    // --- NUEVO PASO 3: Segunda Confirmación (final) ---
+    const secondConfirmation = window.confirm(
+      "El proceso de envío comenzará en segundo plano y no se puede detener. ¿Estás seguro?"
     );
-    if (!isConfirmed || !campaignId) return;
-  
-    // Los estados de carga y error se quedan igual.
-    setIsSendingCampaign(true);
-    setCampaignError(null);
-    setCampaignSuccess(null); // Lo quitamos de aquí, ya no es necesario
-  
-    try {
-      const { data, error: invokeError } = await supabase.functions.invoke('send-campaign', {
-        body: { campaign_id: campaignId },
-      });
-  
-      if (invokeError) {
-        throw new Error(`Error de la Edge Function: ${invokeError.message}`);
-      }
-      
-      // --- ¡AQUÍ ESTÁ LA MAGIA! ---
-  
-      // CAMBIO 1: El pop-up ahora muestra el resumen que viene del backend.
-      alert(data.message); 
-  
-      // CAMBIO 2: Redirigimos al usuario a la página de estadísticas.
-      router.push(`/campaigns/stats/${campaignId}`);
-  
-    } catch (e) {
-      const errorMessage = (e as Error).message;
-      console.error('Error al enviar la campaña:', errorMessage);
-      setCampaignError(errorMessage);
-    } finally {
-      // Esto se ejecutará, pero el usuario ya estará en proceso de redirección.
-      setIsSendingCampaign(false); 
+    if (!secondConfirmation) {
+      setIsSendingCampaign(false);
+      return;
     }
-  };
+
+    // --- PASO 4: Disparamos el envío ---
+    const { data, error: invokeError } = await supabase.functions.invoke('trigger-campaign', {
+      body: { campaign_id: campaignId },
+    });
+    
+    if (invokeError) throw new Error(`Error al encolar la campaña: ${invokeError.message}`);
+    
+    alert(data.message || '¡Campaña puesta en cola para envío!');
+    router.push('/campaigns');
+
+  } catch (e) {
+    const errorMessage = (e as Error).message;
+    alert(errorMessage); // Mostramos el error directamente al usuario
+    setCampaignError(errorMessage);
+    setIsSendingCampaign(false);
+  }
+};
 
   if (isLoading) {
     return <div className="w-full text-center p-8">Cargando editor...</div>;

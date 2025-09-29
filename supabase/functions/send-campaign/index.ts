@@ -2,7 +2,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { getCorsHeaders } from '../_shared/cors.ts'
 
 import { SESv2Client, SendEmailCommand } from 'npm:@aws-sdk/client-sesv2'
 import { FetchHttpHandler } from 'npm:@smithy/fetch-http-handler'
@@ -19,8 +19,9 @@ const sesClient = new SESv2Client({
 });
 
 serve(async (req: Request) => {
+  const requestOrigin = req.headers.get('Origin');
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: getCorsHeaders(requestOrigin) })
   }
 
   try {
@@ -57,7 +58,7 @@ serve(async (req: Request) => {
     console.warn(errorMessage);
     // Devolvemos un error 400 (Bad Request) que el frontend puede atrapar
     return new Response(JSON.stringify({ error: errorMessage }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...getCorsHeaders(requestOrigin), 'Content-Type': 'application/json' },
       status: 400,
     });
   }
@@ -101,14 +102,14 @@ serve(async (req: Request) => {
     await supabaseAdmin.from('campaigns').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', campaign_id);
 
     return new Response(JSON.stringify({ message: `Campaña enviada con éxito a ${contacts.length} contactos.` }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...getCorsHeaders(requestOrigin), 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
     console.error("Error al procesar la campaña:", error);
     return new Response(JSON.stringify({ error: (error as Error).message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...getCorsHeaders(requestOrigin), 'Content-Type': 'application/json' },
       status: 500,
     });
   }

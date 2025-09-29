@@ -16,7 +16,7 @@ const formatPercentage = (value: number) => {
 };
 
 // --- Tipos de datos ---
-type CampaignDetails = { name: string; subject: string; sent_at: string; };
+type CampaignDetails = { name: string; subject: string; sent_at: string; recipients_count: number };
 type Stats = { opens: number; clicks: number; bounces: number; complaints: number; delivered: number; };
 type ClickReport = { url: string; total_clicks: number; }; // Corregido a 'url'
 type ChartData = { day: string; opens: number; clicks: number; };
@@ -50,7 +50,7 @@ export default function CampaignStatsPage() {
       setError(null);
 
       try {
-        const detailsQuery = supabase.from('campaigns').select('name, subject, sent_at').eq('id', campaignId).single();
+        const detailsQuery = supabase.from('campaigns').select('name, subject, sent_at, recipients_count').eq('id', campaignId).single();
         const opensQuery = supabase.from('campaign_opens').select('*', { count: 'exact', head: true }).eq('campaign_id', campaignId);
         const clicksQuery = supabase.from('campaign_clicks').select('*', { count: 'exact', head: true }).eq('campaign_id', campaignId);
         const bouncesQuery = supabase.from('campaign_bounces').select('*', { count: 'exact', head: true }).eq('campaign_id', campaignId);
@@ -108,28 +108,41 @@ export default function CampaignStatsPage() {
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
-      <header className="mb-8">
-        <p className="text-sm text-gray-500">Reporte de Campaña</p>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{details.name}</h1>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full">Enviada</span>
-            <span className="text-xs text-gray-500">
-              {format(new Date(details.sent_at), "d 'de' LLLL, yyyy 'a las' p", { locale: es })}
-            </span>
-          </div>
-        </div>
-        <p className="text-base text-gray-600 mt-1">Asunto: {details.subject}</p>
-      </header>
+      <header className="mb-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+  <div className="flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <p className="text-sm text-gray-500">Reporte de Campaña</p>
+      <h1 className="text-2xl font-bold text-gray-900 mt-1">{details.name}</h1>
+      <p className="text-sm text-gray-600 mt-1">Asunto: {details.subject}</p>
+    </div>
+    <div className="text-xs text-gray-500 text-right">
+      <span className="font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full">Enviada</span>
+      <p className="mt-1">{format(new Date(details.sent_at), "d MMM, yyyy 'a las' p", { locale: es })}</p>
+    </div>
+  </div>
+  
+  <div className="border-t border-gray-200 mt-4 pt-4 flex items-center space-x-6 md:space-x-8">
+    <div className="text-center">
+      <p className="text-2xl font-semibold text-[#3c527a]">{details.recipients_count ?? 0}</p>
+      <p className="text-xs text-gray-500 uppercase">Destinatarios</p>
+    </div>
+    <div className="text-center">
+      <p className="text-2xl font-semibold text-[#3c527a]">{stats.opens}</p>
+      <p className="text-xs text-gray-500 uppercase">Aperturas</p>
+    </div>
+    <div className="text-center">
+      <p className="text-2xl font-semibold text-[#3c527a]">{stats.clicks}</p>
+      <p className="text-xs text-gray-500 uppercase">Clics</p>
+    </div>
+  </div>
+</header>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <StatCard label="Aperturas" value={stats.opens} />
-        <StatCard label="Clics" value={stats.clicks} />
-        <StatCard label="Tasa de Apertura" value={`${formatPercentage(openRate)}%`} />
-        <StatCard label="Tasa de Clics" value={`${formatPercentage(clickRate)}%`} />
-        <StatCard label="Rebotes" value={stats.bounces} />
-        <StatCard label="Quejas" value={stats.complaints} />
-      </div>
+<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+  <StatCard label="Tasa de Apertura" value={`${formatPercentage(openRate)}%`} />
+  <StatCard label="Tasa de Clics" value={`${formatPercentage(clickRate)}%`} />
+  <StatCard label="Rebotes" value={stats.bounces} />
+  <StatCard label="Quejas" value={stats.complaints} />
+</div>
       
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-8">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Actividad de la Campaña</h2>
