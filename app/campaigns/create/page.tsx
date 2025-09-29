@@ -23,6 +23,7 @@ export default function CreateCampaignPage() {
     // Verificamos que tengamos un usuario antes de continuar
     if (!user) {
         alert('No se pudo identificar al usuario. Por favor, inicia sesión de nuevo.');
+        setIsSaving(false);
         return;
     }
 
