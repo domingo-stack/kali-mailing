@@ -13,6 +13,10 @@ type Notification = {
   link_url: string | null;
 };
 
+type NotificationPayload = {
+  new: Notification;
+};
+
 export default function Notifications() {
   const { user, supabase   } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -46,7 +50,7 @@ export default function Notifications() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `recipient_user_id=eq.${user.id}` },
-        (payload) => {
+        (payload: NotificationPayload) => {
           // Cuando llega una nueva, la añadimos al principio de la lista
           setNotifications(currentNotifications => [payload.new as Notification, ...currentNotifications]);
         }
