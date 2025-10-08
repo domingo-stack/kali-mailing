@@ -2,88 +2,79 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useMemo } from 'react'
-import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation';
+import type { Session, User } from '@supabase/supabase-js'
+// --- CAMBIO 1: Importamos nuestro nuevo creador de cliente ---
+import { createClient } from '@/supabase/client'
 
-// --- 1. Definimos el tipo para el perfil del usuario ---
+// Definimos el tipo para el perfil (está perfecto como lo tenías)
 type Profile = {
   role: string;
-  // aquí podrías añadir más campos en el futuro, como 'full_name', 'avatar_url', etc.
 };
 
-// --- 2. Añadimos 'profile' al tipo del contexto ---
 type AuthContextType = { 
   session: Session | null; 
   user: User | null; 
-  profile: Profile | null; // <-- Nuevo
+  profile: Profile | null;
   isLoading: boolean;
-  supabase: SupabaseClient;
+  supabase: any; // El tipo exacto del cliente SSR es complejo, 'any' es una solución práctica aquí
 };
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // --- CAMBIO 2: Creamos el cliente DENTRO del provider y obtenemos el router ---
+  const supabase = createClient();
+  const router = useRouter();
+
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null); // <-- Nuevo estado
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // --- CAMBIO 3: Un useEffect unificado y más robusto ---
   useEffect(() => {
-    // La comprobación de sesión inicial ahora también busca el perfil
-    const checkInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // No necesitamos 'checkInitialSession', onAuthStateChange se encarga de todo.
+      
       setSession(session);
       setUser(session?.user ?? null);
 
-      // --- 3. Lógica para buscar el perfil ---
       if (session?.user) {
+        // Tu lógica para buscar el perfil se mantiene, ¡perfecto!
         const { data: profileData } = await supabase
           .from('profiles')
           .select('role')
           .eq('user_id', session.user.id)
           .single();
-        setProfile(profileData);
-      }
-      setIsLoading(false);
-    }
-    
-    checkInitialSession();
-
-    // El listener de cambios de sesión también actualiza el perfil
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .single();
-        setProfile(profileData);
+        setProfile(profileData as Profile | null);
       } else {
-        setProfile(null); // Limpiamos el perfil al cerrar sesión
+        setProfile(null);
       }
+      
+      setIsLoading(false);
+      
+      // Buena práctica recomendada por Supabase: refresca la página en cambios de sesión
+      // para asegurar que los Componentes de Servidor se actualicen.
+      router.refresh();
     });
 
-    return () => { subscription.unsubscribe(); };
-  }, []);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase, router]);
 
   const value = useMemo(() => ({
     session,
     user,
-    profile, // <-- Nuevo valor proveído
+    profile,
     isLoading,
     supabase,
-  }), [session, user, profile, isLoading]);
+  }), [session, user, profile, isLoading, supabase]);
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!isLoading && children}
     </AuthContext.Provider>
   );
 }
