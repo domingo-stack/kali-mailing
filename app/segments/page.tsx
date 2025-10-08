@@ -43,7 +43,7 @@ export default function SegmentsPage() {
     }
 
     const segmentsWithCounts = await Promise.all(
-      segmentsData.map(async (segment) => {
+      segmentsData.map(async (segment: Segment) => {
         const { data: count, error: countError } = await supabase.rpc('get_segment_contact_count', { p_segment_id: segment.id });
         if (countError) {
           console.error(`Error fetching count for segment ${segment.id}:`, countError);
