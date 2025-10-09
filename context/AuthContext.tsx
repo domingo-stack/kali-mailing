@@ -24,7 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- CAMBIO 2: Creamos el cliente DENTRO del provider y obtenemos el router ---
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
   const router = useRouter();
 
   const [session, setSession] = useState<Session | null>(null);
@@ -34,34 +34,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- CAMBIO 3: Un useEffect unificado y más robusto ---
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // No necesitamos 'checkInitialSession', onAuthStateChange se encarga de todo.
-      
-      setSession(session);
-      setUser(session?.user ?? null);
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
 
-      if (session?.user) {
-        // Tu lógica para buscar el perfil se mantiene, ¡perfecto!
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .single();
-        setProfile(profileData as Profile | null);
-      } else {
-        setProfile(null);
-      }
-      
+        if (session?.user) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .single();
+          setProfile(profileData as Profile | null);
+        } else {
+          setProfile(null);
+        }
+        
+        setIsLoading(false);
+        router.refresh();
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    } catch (error) {
+      console.error("¡ERROR CRÍTICO AL INICIALIZAR AuthContext!:", error);
+      // ¡IMPORTANTE! Liberamos la app aunque haya un error para que no se quede en blanco.
       setIsLoading(false);
-      
-      // Buena práctica recomendada por Supabase: refresca la página en cambios de sesión
-      // para asegurar que los Componentes de Servidor se actualicen.
-      router.refresh();
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    }
+    // -------------------------------------------------------------
   }, [supabase, router]);
 
   const value = useMemo(() => ({
